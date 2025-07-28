@@ -1,58 +1,55 @@
 import { chromium, FullConfig } from '@playwright/test';
+import path from 'path';
 
-/**
- * Global setup for test environment
- * Runs once before all tests
- */
 async function globalSetup(config: FullConfig) {
-  console.log('🔧 Starting global setup...');
+  console.log('🔧 Starting Global Test Setup...');
+  
+  // Create screenshots directory
+  const screenshotsDir = path.join(process.cwd(), 'test-results', 'screenshots');
+  const fs = require('fs');
+  if (!fs.existsSync(screenshotsDir)) {
+    fs.mkdirSync(screenshotsDir, { recursive: true });
+  }
 
-  // Create browser instance for setup
+  // Verify Orange HRM application is accessible
   const browser = await chromium.launch();
-  const context = await browser.newContext();
-  const page = await context.newPage();
-
+  const page = await browser.newPage();
+  
   try {
-    // Test if Orange HRM demo site is accessible
-    console.log('🌐 Testing Orange HRM demo site accessibility...');
-    const response = await page.goto('https://opensource-demo.orangehrmlive.com');
+    console.log('🌐 Verifying Orange HRM application accessibility...');
+    await page.goto('https://opensource-demo.orangehrmlive.com/web/index.php/auth/login', {
+      timeout: 30000,
+      waitUntil: 'networkidle'
+    });
     
-    if (!response || response.status() !== 200) {
-      throw new Error('Orange HRM demo site is not accessible');
-    }
+    // Check if login page elements are present
+    const usernameField = page.locator('[name="username"]');
+    const passwordField = page.locator('[name="password"]');
+    const loginButton = page.locator('[type="submit"]');
     
-    console.log('✅ Orange HRM demo site is accessible');
-
-    // Verify login form is present
-    await page.waitForSelector('[name="username"]', { timeout: 10000 });
-    await page.waitForSelector('[name="password"]', { timeout: 10000 });
-    await page.waitForSelector('[type="submit"]', { timeout: 10000 });
+    await usernameField.waitFor({ state: 'visible', timeout: 10000 });
+    await passwordField.waitFor({ state: 'visible', timeout: 10000 });
+    await loginButton.waitFor({ state: 'visible', timeout: 10000 });
     
-    console.log('✅ Login form elements verified');
-
-    // Test basic login functionality
-    console.log('🔑 Testing basic login functionality...');
-    await page.fill('[name="username"]', 'Admin');
-    await page.fill('[name="password"]', 'admin123');
-    await page.click('[type="submit"]');
+    console.log('✅ Orange HRM application is accessible and ready for testing');
     
-    // Wait for dashboard or error
-    try {
-      await page.waitForSelector('.oxd-topbar-header', { timeout: 15000 });
-      console.log('✅ Basic login functionality verified');
-    } catch (error) {
-      console.warn('⚠️ Login might be slow or demo credentials changed');
-      // Continue with tests anyway
-    }
-
+    // Verify admin login credentials work
+    await usernameField.fill('Admin');
+    await passwordField.fill('admin123');
+    await loginButton.click();
+    
+    // Wait for dashboard to load
+    await page.waitForSelector('.oxd-topbar-header-breadcrumb', { timeout: 15000 });
+    console.log('✅ Admin credentials verified successfully');
+    
   } catch (error) {
     console.error('❌ Global setup failed:', error);
-    throw error;
+    throw new Error(`Failed to verify Orange HRM application: ${error}`);
   } finally {
     await browser.close();
   }
-
-  console.log('✅ Global setup completed successfully');
+  
+  console.log('🚀 Global Test Setup completed successfully!');
 }
 
 export default globalSetup; 

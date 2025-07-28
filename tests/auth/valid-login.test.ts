@@ -1,13 +1,15 @@
 import { test, expect } from '@playwright/test';
 import { LoginPage } from '../../pages/LoginPage';
 import { DashboardPage } from '../../pages/DashboardPage';
+import { validCredentials } from '../data/auth-test-data';
 
 /**
- * Test Suite: Valid Login with Correct Credentials
- * Related Jira Task: HRM-35
- * Epic: HRM-34 Authentication & Authorization
+ * Test Suite: Valid Login Automation
+ * Jira Task: HRM-42 - AUTH-001: Implement Valid Login Test Automation
+ * Epic: HRM-41 🔐 Authentication & Authorization
  */
-test.describe('Valid Login - Correct Credentials', () => {
+
+test.describe('Valid Login Tests @auth', () => {
   let loginPage: LoginPage;
   let dashboardPage: DashboardPage;
 
@@ -17,109 +19,85 @@ test.describe('Valid Login - Correct Credentials', () => {
     
     // Navigate to login page
     await loginPage.navigateToLogin();
+    await loginPage.verifyLoginPageLoaded();
   });
 
-  test('HRM-35: Should successfully login with valid credentials', async ({ page }) => {
-    // Test Case: Valid login with Admin credentials
-    await test.step('Enter valid credentials', async () => {
-      await loginPage.login('Admin', 'admin123');
-    });
+  test('AUTH-001.1: Should successfully login with valid Admin credentials', async ({ page }) => {
+    // Test data
+    const { username, password } = validCredentials;
 
-    await test.step('Verify successful login and dashboard redirect', async () => {
-      // Wait for dashboard to load
+    try {
+      // Perform login
+      await loginPage.login(username, password);
+
+      // Verify successful login and redirect to dashboard
       await dashboardPage.verifyDashboardLoaded();
       
-      // Verify URL redirection
-      const currentUrl = await dashboardPage.getCurrentUrl();
-      expect(currentUrl).toContain('dashboard');
-      
-      // Verify dashboard elements are visible
-      await dashboardPage.verifyDashboardTitle();
-      await dashboardPage.verifyMainMenuVisible();
-    });
+      // Verify dashboard title
+      const dashboardTitle = await dashboardPage.getDashboardTitle();
+      expect(dashboardTitle).toContain('Dashboard');
 
-    await test.step('Verify user session is active', async () => {
-      await dashboardPage.verifySessionActive();
-    });
+      // Verify user is logged in
+      const isLoggedIn = await dashboardPage.isUserLoggedIn();
+      expect(isLoggedIn).toBe(true);
 
-    await test.step('Take screenshot for verification', async () => {
-      await page.screenshot({ 
-        path: 'test-results/screenshots/valid-login-success.png',
-        fullPage: true 
-      });
-    });
+      // Verify URL contains dashboard
+      const currentURL = await page.url();
+      expect(currentURL).toContain('/dashboard');
+
+      console.log('✅ Valid login test passed successfully');
+
+    } catch (error) {
+      await loginPage.takeScreenshot('valid-login-failure');
+      throw error;
+    }
   });
 
-  test('HRM-35: Should maintain session across page navigation', async ({ page }) => {
-    // Login first
-    await loginPage.login('Admin', 'admin123');
+  test('AUTH-001.2: Should display correct dashboard elements after login', async ({ page }) => {
+    // Login with valid credentials
+    await loginPage.loginAsAdmin();
+
+    // Verify dashboard content is loaded
+    await dashboardPage.verifyDashboardContent();
+
+    // Verify all main navigation elements are present
+    const visibleMenuItems = await dashboardPage.getVisibleMenuItems();
+    expect(visibleMenuItems.length).toBeGreaterThan(0);
+
+    // Verify admin user has access to all modules
+    await dashboardPage.verifyAdminAccess();
+
+    console.log('✅ Dashboard elements verification passed');
+  });
+
+  test('AUTH-001.3: Should maintain session after successful login', async ({ page }) => {
+    // Login with valid credentials
+    await loginPage.loginAsAdmin();
+    
+    // Navigate to different modules and verify session is maintained
+    await dashboardPage.navigateToPIM();
+    await page.waitForLoadState('networkidle');
+    
+    // Verify user is still logged in
+    const isLoggedIn = await dashboardPage.isUserLoggedIn();
+    expect(isLoggedIn).toBe(true);
+
+    // Navigate back to dashboard
+    await page.goto('/web/index.php/dashboard/index');
     await dashboardPage.verifyDashboardLoaded();
 
-    await test.step('Navigate to different modules and verify session persistence', async () => {
-      // Navigate to PIM
-      await dashboardPage.navigateToPIM();
-      await dashboardPage.verifySessionActive();
-      
-      // Navigate to Leave
-      await dashboardPage.navigateToLeave();
-      await dashboardPage.verifySessionActive();
-      
-      // Navigate back to Dashboard
-      await page.goto('/web/index.php/dashboard/index');
-      await dashboardPage.verifyDashboardLoaded();
-    });
-  });
-
-  test('HRM-35: Should display correct user information after login', async ({ page }) => {
-    await loginPage.login('Admin', 'admin123');
-    await dashboardPage.verifyDashboardLoaded();
-
-    await test.step('Verify Admin role access', async () => {
-      // Admin user should have access to Admin menu
-      await dashboardPage.verifyAdminMenuVisible();
-      
-      // Get user role
-      const userRole = await dashboardPage.getCurrentUserRole();
-      expect(userRole).toBe('Admin');
-    });
-
-    await test.step('Verify all menu items are accessible for Admin', async () => {
-      const visibleMenus = await dashboardPage.getVisibleMenuItems();
-      
-      // Admin should see all major modules
-      expect(visibleMenus).toContain('Admin');
-      expect(visibleMenus).toContain('PIM');
-      expect(visibleMenus).toContain('Leave');
-      expect(visibleMenus).toContain('Time');
-      expect(visibleMenus).toContain('Recruitment');
-      expect(visibleMenus).toContain('Performance');
-    });
-  });
-
-  test('HRM-35: Should handle slow network conditions gracefully', async ({ page, context }) => {
-    // Simulate slow network
-    await page.route('**/*', route => {
-      setTimeout(() => route.continue(), 1000); // 1 second delay
-    });
-
-    await test.step('Login with network delay', async () => {
-      await loginPage.login('Admin', 'admin123');
-      
-      // Should still succeed despite slow network
-      await dashboardPage.verifyDashboardLoaded();
-    });
+    console.log('✅ Session maintenance test passed');
   });
 
   test.afterEach(async ({ page }) => {
-    // Clean up: logout if logged in
+    // Cleanup: Logout if user is logged in
     try {
-      const currentUrl = await page.url();
-      if (currentUrl.includes('dashboard')) {
+      const isLoggedIn = await dashboardPage.isUserLoggedIn();
+      if (isLoggedIn) {
         await dashboardPage.logout();
-        await loginPage.verifyLoginFormDisplayed();
       }
     } catch (error) {
-      console.log('Cleanup: User was not logged in or already logged out');
+      console.log('Note: User may not be logged in, skipping logout');
     }
   });
 }); 

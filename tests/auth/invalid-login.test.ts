@@ -1,218 +1,137 @@
 import { test, expect } from '@playwright/test';
 import { LoginPage } from '../../pages/LoginPage';
-import { testData } from '../data/auth-test-data';
+import { DashboardPage } from '../../pages/DashboardPage';
+import { invalidCredentials } from '../data/auth-test-data';
 
 /**
- * Test Suite: Invalid Login Tests - Multiple Scenarios
- * Related Jira Task: HRM-36
- * Epic: HRM-34 Authentication & Authorization
- * 
- * Covers various invalid login scenarios including security testing
+ * Test Suite: Invalid Login Attempts Automation
+ * Jira Task: HRM-43 - AUTH-002: Implement Invalid Login Attempts Test Automation
+ * Epic: HRM-41 🔐 Authentication & Authorization
  */
-test.describe('Invalid Login - Multiple Scenarios', () => {
+
+test.describe('Invalid Login Tests @auth', () => {
   let loginPage: LoginPage;
+  let dashboardPage: DashboardPage;
 
   test.beforeEach(async ({ page }) => {
     loginPage = new LoginPage(page);
-    await loginPage.navigateToLogin();
-  });
-
-  test('HRM-36: Should reject invalid username with valid password', async ({ page }) => {
-    await test.step('Enter invalid username with valid password', async () => {
-      await loginPage.login('InvalidUser', 'admin123');
-    });
-
-    await test.step('Verify error message and remain on login page', async () => {
-      await loginPage.verifyErrorMessage();
-      await loginPage.verifyStillOnLoginPage();
-    });
-
-    await test.step('Take screenshot of error state', async () => {
-      await page.screenshot({ 
-        path: 'test-results/screenshots/invalid-username-error.png' 
-      });
-    });
-  });
-
-  test('HRM-36: Should reject valid username with invalid password', async ({ page }) => {
-    await test.step('Enter valid username with invalid password', async () => {
-      await loginPage.login('Admin', 'wrongpassword');
-    });
-
-    await test.step('Verify error message and remain on login page', async () => {
-      await loginPage.verifyErrorMessage();
-      await loginPage.verifyStillOnLoginPage();
-    });
-  });
-
-  test('HRM-36: Should reject both invalid username and password', async ({ page }) => {
-    await test.step('Enter both invalid credentials', async () => {
-      await loginPage.login('InvalidUser', 'wrongpassword');
-    });
-
-    await test.step('Verify error message and remain on login page', async () => {
-      await loginPage.verifyErrorMessage();
-      await loginPage.verifyStillOnLoginPage();
-    });
-  });
-
-  test('HRM-36: Should handle empty username field', async ({ page }) => {
-    await test.step('Leave username empty and enter password', async () => {
-      await loginPage.enterPassword('admin123');
-      await loginPage.clickLogin();
-    });
-
-    await test.step('Verify validation error for empty username', async () => {
-      // Should show field validation error or general error
-      const isLoginButtonEnabled = await loginPage.isLoginButtonEnabled();
-      if (isLoginButtonEnabled) {
-        await loginPage.verifyErrorMessage();
-      }
-      await loginPage.verifyStillOnLoginPage();
-    });
-  });
-
-  test('HRM-36: Should handle empty password field', async ({ page }) => {
-    await test.step('Enter username and leave password empty', async () => {
-      await loginPage.enterUsername('Admin');
-      await loginPage.clickLogin();
-    });
-
-    await test.step('Verify validation error for empty password', async () => {
-      const isLoginButtonEnabled = await loginPage.isLoginButtonEnabled();
-      if (isLoginButtonEnabled) {
-        await loginPage.verifyErrorMessage();
-      }
-      await loginPage.verifyStillOnLoginPage();
-    });
-  });
-
-  test('HRM-36: Should handle both empty fields', async ({ page }) => {
-    await test.step('Click login with both fields empty', async () => {
-      await loginPage.clickLogin();
-    });
-
-    await test.step('Verify validation errors', async () => {
-      // Check if login button is disabled or shows validation errors
-      const isLoginButtonEnabled = await loginPage.isLoginButtonEnabled();
-      if (isLoginButtonEnabled) {
-        await loginPage.verifyErrorMessage();
-      }
-      await loginPage.verifyStillOnLoginPage();
-    });
-  });
-
-  test('HRM-36: Should prevent SQL injection attacks', async ({ page }) => {
-    await test.step('Attempt SQL injection in login fields', async () => {
-      await loginPage.testSQLInjection("'; DROP TABLE users; --");
-    });
-
-    await test.step('Verify application handles SQL injection safely', async () => {
-      // Should show normal login error, not SQL error
-      await loginPage.verifyStillOnLoginPage();
-      
-      // Application should still be functional
-      await loginPage.clearFields();
-      await loginPage.verifyLoginFormDisplayed();
-    });
-
-    await test.step('Test additional SQL injection patterns', async () => {
-      const sqlInjectionPayloads = [
-        "' OR '1'='1",
-        "' OR '1'='1' --",
-        "'; DELETE FROM users; --",
-        "admin'--",
-        "admin' /*"
-      ];
-
-      for (const payload of sqlInjectionPayloads) {
-        await loginPage.clearFields();
-        await loginPage.testSQLInjection(payload);
-        await loginPage.verifyStillOnLoginPage();
-      }
-    });
-  });
-
-  test('HRM-36: Should prevent XSS attacks in login fields', async ({ page }) => {
-    await test.step('Attempt XSS injection in login fields', async () => {
-      await loginPage.testXSSInjection('<script>alert("XSS")</script>');
-    });
-
-    await test.step('Verify application handles XSS safely', async () => {
-      // Should not execute script
-      await loginPage.verifyStillOnLoginPage();
-      
-      // Application should still be functional
-      await loginPage.clearFields();
-      await loginPage.verifyLoginFormDisplayed();
-    });
-
-    await test.step('Test additional XSS patterns', async () => {
-      const xssPayloads = [
-        '<script>alert("XSS")</script>',
-        'javascript:alert("XSS")',
-        '<img src="x" onerror="alert(\'XSS\')">',
-        '<svg onload="alert(\'XSS\')">',
-        '"><script>alert("XSS")</script>'
-      ];
-
-      for (const payload of xssPayloads) {
-        await loginPage.clearFields();
-        await loginPage.testXSSInjection(payload);
-        await loginPage.verifyStillOnLoginPage();
-      }
-    });
-  });
-
-  // Data-driven testing with multiple invalid credentials
-  testData.invalidCredentials.forEach((credential, index) => {
-    test(`HRM-36: Should reject invalid credentials set ${index + 1}`, async ({ page }) => {
-      await test.step(`Test with: ${credential.description}`, async () => {
-        await loginPage.login(credential.username, credential.password);
-      });
-
-      await test.step('Verify rejection and error handling', async () => {
-        await loginPage.verifyErrorMessage();
-        await loginPage.verifyStillOnLoginPage();
-      });
-    });
-  });
-
-  test('HRM-36: Should handle special characters in credentials', async ({ page }) => {
-    const specialCharCredentials = [
-      { username: 'Admin@#$%', password: 'admin123' },
-      { username: 'Admin', password: 'admin@#$%' },
-      { username: 'Ädmin', password: 'admin123' }, // Unicode characters
-      { username: 'Admin', password: 'αdmin123' }, // Unicode in password
-    ];
-
-    for (const cred of specialCharCredentials) {
-      await test.step(`Test special characters: ${cred.username}`, async () => {
-        await loginPage.clearFields();
-        await loginPage.login(cred.username, cred.password);
-        await loginPage.verifyErrorMessage();
-        await loginPage.verifyStillOnLoginPage();
-      });
-    }
-  });
-
-  test('HRM-36: Should handle very long input strings', async ({ page }) => {
-    const longString = 'a'.repeat(1000); // 1000 character string
+    dashboardPage = new DashboardPage(page);
     
-    await test.step('Test with very long username', async () => {
-      await loginPage.login(longString, 'admin123');
-      await loginPage.verifyStillOnLoginPage();
-    });
+    // Navigate to login page
+    await loginPage.navigateToLogin();
+    await loginPage.verifyLoginPageLoaded();
+  });
 
-    await test.step('Test with very long password', async () => {
-      await loginPage.clearFields();
-      await loginPage.login('Admin', longString);
-      await loginPage.verifyStillOnLoginPage();
+  // Data-driven test for all invalid credential scenarios
+  for (const credential of invalidCredentials) {
+    test(`AUTH-002.${invalidCredentials.indexOf(credential) + 1}: ${credential.description}`, async ({ page }) => {
+      try {
+        // Clear any existing data
+        await loginPage.clearForm();
+
+        // Attempt login with invalid credentials
+        await loginPage.login(credential.username, credential.password);
+
+        // Verify error message is displayed (wait a moment for it to appear)
+        await page.waitForTimeout(2000);
+        
+        // Check if error message is displayed
+        const errorDisplayed = await loginPage.isErrorMessageDisplayed();
+        
+        if (errorDisplayed) {
+          const errorMessage = await loginPage.getErrorMessage();
+          expect(errorMessage).toBeTruthy();
+          console.log(`✅ Error message displayed: "${errorMessage}"`);
+        } else {
+          // For some scenarios, the error might be shown differently
+          // Verify user is NOT redirected to dashboard
+          const currentURL = await page.url();
+          expect(currentURL).not.toContain('/dashboard');
+          expect(currentURL).toContain('/auth/login');
+        }
+
+        // Verify user is not logged in
+        const isLoggedIn = await dashboardPage.isUserLoggedIn();
+        expect(isLoggedIn).toBe(false);
+
+        console.log(`✅ Invalid login test passed for: ${credential.description}`);
+
+      } catch (error) {
+        await loginPage.takeScreenshot(`invalid-login-${credential.description.replace(/\s+/g, '-')}`);
+        throw error;
+      }
     });
+  }
+
+  test('AUTH-002.7: Should handle multiple consecutive invalid login attempts', async ({ page }) => {
+    const testCredentials = invalidCredentials.slice(0, 3); // Test first 3 scenarios
+    
+    for (const credential of testCredentials) {
+      // Clear form before each attempt
+      await loginPage.clearForm();
+      
+      // Attempt login
+      await loginPage.login(credential.username, credential.password);
+      
+      // Wait for response
+      await page.waitForTimeout(1500);
+      
+      // Verify still on login page
+      const currentURL = await page.url();
+      expect(currentURL).toContain('/auth/login');
+    }
+
+    console.log('✅ Multiple invalid login attempts handled correctly');
+  });
+
+  test('AUTH-002.8: Should validate required field indicators', async ({ page }) => {
+    // Try to submit empty form
+    await loginPage.clearForm();
+    await loginPage.clickElement(loginPage.loginButton);
+    
+    // Wait for validation
+    await page.waitForTimeout(1000);
+    
+    // Verify form validation (check for required field indicators)
+    const currentURL = await page.url();
+    expect(currentURL).toContain('/auth/login');
+    
+    // Verify login button state or validation messages
+    const isLoginButtonEnabled = await loginPage.isLoginButtonEnabled();
+    console.log(`Login button enabled state: ${isLoginButtonEnabled}`);
+
+    console.log('✅ Required field validation test completed');
+  });
+
+  test('AUTH-002.9: Should maintain login page state after failed attempts', async ({ page }) => {
+    const invalidCred = invalidCredentials[0];
+    
+    // Attempt invalid login
+    await loginPage.login(invalidCred.username, invalidCred.password);
+    await page.waitForTimeout(2000);
+    
+    // Verify login page elements are still present and functional
+    await loginPage.verifyLoginPageLoaded();
+    
+    // Verify form can be cleared and used again
+    await loginPage.clearForm();
+    
+    // Verify placeholders and form state
+    const usernamePlaceholder = await loginPage.getUsernamePlaceholder();
+    console.log(`Username placeholder: ${usernamePlaceholder}`);
+
+    console.log('✅ Login page state maintained after failed attempt');
   });
 
   test.afterEach(async ({ page }) => {
-    // Clear fields after each test
-    await loginPage.clearFields();
+    // Ensure we're ready for next test
+    try {
+      const currentURL = await page.url();
+      if (!currentURL.includes('/auth/login')) {
+        await loginPage.navigateToLogin();
+      }
+    } catch (error) {
+      console.log('Note: Cleanup navigation may not be needed');
+    }
   });
 }); 

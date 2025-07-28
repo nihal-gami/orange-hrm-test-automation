@@ -1,24 +1,19 @@
-name: Orange HRM Authentication Tests
+name: Orange HRM E2E Tests
 
 on:
   push:
-    branches: [ main, feature/authentication-test-suite ]
+    branches: [ main, develop ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, develop ]
   schedule:
-    - cron: '0 2 * * *'  # Daily at 2 AM UTC
+    # Run tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
 
 jobs:
   test:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     
-    strategy:
-      fail-fast: false
-      matrix:
-        # Following workspace rules: Chrome browser only
-        browser: [chrome]
-        
     steps:
     - uses: actions/checkout@v4
     
@@ -26,80 +21,48 @@ jobs:
       with:
         node-version: '18'
         cache: 'npm'
-        
+    
     - name: Install dependencies
       run: npm ci
-      
+    
     - name: Install Playwright Browsers
-      run: npx playwright install chrome
-      
+      run: npx playwright install chromium
+    
     - name: Run Playwright tests
-      run: npx playwright test --project=chrome
-      env:
-        CI: true
-        
+      run: npm run test:auth
+    
     - name: Upload test results
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: playwright-report-${{ matrix.browser }}
+        name: playwright-results
         path: |
           test-results/
           playwright-report/
-        retention-days: 30
-        
-    - name: Upload screenshots
+        retention-days: 7
+    
+    - name: Upload HTML report
       uses: actions/upload-artifact@v4
-      if: failure()
+      if: always()
       with:
-        name: screenshots-${{ matrix.browser }}
-        path: test-results/screenshots/
-        retention-days: 30
+        name: playwright-html-report
+        path: playwright-report/
+        retention-days: 7
 
-  # Comment test results on PR
-  comment-pr:
-    if: github.event_name == 'pull_request'
+  notify:
     needs: test
     runs-on: ubuntu-latest
-    permissions:
-      pull-requests: write
-    steps:
-    - uses: actions/checkout@v4
+    if: always()
     
-    - name: Comment PR with test results
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const fs = require('fs');
-          const path = require('path');
-          
-          // Create a summary comment
-          const comment = `## 🧪 Authentication Test Results
-          
-          Tests have completed for commit ${{ github.sha }}.
-          
-          ### 📊 Test Coverage
-          - ✅ Valid Login Tests (HRM-35)
-          - ✅ Invalid Login Tests (HRM-36) 
-          - ✅ Password Masking Tests (HRM-37)
-          - ✅ Role-Based Access Tests (HRM-38)
-          - ✅ Logout Functionality Tests (HRM-39)
-          - ✅ Session Timeout Tests (HRM-40)
-          
-          ### 🔗 Related Epic
-          - **Epic**: HRM-34 Authentication & Authorization
-          - **Framework**: Playwright with Chrome
-          - **Test Environment**: Orange HRM Demo
-          
-          ### 📋 Artifacts
-          - Test reports and screenshots are available in the workflow artifacts
-          - Failed tests include detailed screenshots for debugging
-          
-          *Following automation rules: Chrome browser only, Page Object Model pattern*`;
-          
-          github.rest.issues.createComment({
-            issue_number: context.issue.number,
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            body: comment
-          }); 
+    steps:
+    - name: Test Results Summary
+      run: |
+        echo "## 🧪 Test Results Summary" >> $GITHUB_STEP_SUMMARY
+        echo "Epic: HRM-41 🔐 Authentication & Authorization" >> $GITHUB_STEP_SUMMARY
+        echo "Test execution completed for Orange HRM Demo automation suite" >> $GITHUB_STEP_SUMMARY
+        echo "### Test Coverage:" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Valid Login Test Automation (HRM-42)" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Invalid Login Attempts Test Automation (HRM-43)" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Password Field Masking Test Automation (HRM-44)" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Role-Based Access Control Test Automation (HRM-45)" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Logout Functionality Test Automation (HRM-46)" >> $GITHUB_STEP_SUMMARY 

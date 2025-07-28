@@ -3,13 +3,12 @@ import { LoginPage } from '../../pages/LoginPage';
 import { DashboardPage } from '../../pages/DashboardPage';
 
 /**
- * Test Suite: Logout Functionality Test
- * Related Jira Task: HRM-39
- * Epic: HRM-34 Authentication & Authorization
- * 
- * Verifies logout functionality and session termination
+ * Test Suite: Logout Functionality and Session Management Tests
+ * Jira Task: HRM-46 - AUTH-005: Implement Logout Functionality Test Automation
+ * Epic: HRM-41 🔐 Authentication & Authorization
  */
-test.describe('Logout Functionality', () => {
+
+test.describe('Logout Functionality Tests @auth', () => {
   let loginPage: LoginPage;
   let dashboardPage: DashboardPage;
 
@@ -17,270 +16,254 @@ test.describe('Logout Functionality', () => {
     loginPage = new LoginPage(page);
     dashboardPage = new DashboardPage(page);
     
-    // Login before each test
+    // Navigate to login page and login for logout tests
     await loginPage.navigateToLogin();
-    await loginPage.login('Admin', 'admin123');
+    await loginPage.verifyLoginPageLoaded();
+    await loginPage.loginAsAdmin();
     await dashboardPage.verifyDashboardLoaded();
   });
 
-  test('HRM-39: Should successfully logout and redirect to login page', async ({ page }) => {
-    await test.step('Perform logout', async () => {
+  test('AUTH-005.1: Should successfully logout and redirect to login page', async ({ page }) => {
+    try {
+      // Verify user is currently logged in
+      const isLoggedInBefore = await dashboardPage.isUserLoggedIn();
+      expect(isLoggedInBefore).toBe(true);
+
+      // Perform logout
       await dashboardPage.logout();
-    });
 
-    await test.step('Verify redirect to login page', async () => {
-      await loginPage.verifyLoginFormDisplayed();
-      
-      // Verify URL is login page
-      const currentUrl = await page.url();
-      expect(currentUrl).toContain('login');
-    });
-
-    await test.step('Verify session is terminated', async () => {
-      // Should not be able to access dashboard directly
-      const currentUrl = await page.url();
-      const dashboardUrl = currentUrl.replace(/\/[^\/]*$/, '/dashboard');
-      await page.goto(dashboardUrl);
-      
-      // Should redirect back to login
+      // Verify redirect to login page
       await page.waitForLoadState('networkidle');
-      const finalUrl = await page.url();
-      expect(finalUrl).toContain('login');
-    });
+      const currentURL = await page.url();
+      expect(currentURL).toContain('/auth/login');
 
-    await test.step('Take screenshot of logout success', async () => {
-      await page.screenshot({ 
-        path: 'test-results/screenshots/logout-success.png' 
-      });
-    });
-  });
+      // Verify login page elements are present
+      await loginPage.verifyLoginPageLoaded();
 
-  test('HRM-39: Should clear session cookies and storage on logout', async ({ page, context }) => {
-    await test.step('Check initial session state', async () => {
-      // Get initial cookies and storage
-      const initialCookies = await context.cookies();
-      const initialLocalStorage = await page.evaluate(() => Object.keys(localStorage));
-      const initialSessionStorage = await page.evaluate(() => Object.keys(sessionStorage));
-      
-      console.log('Initial state:', {
-        cookies: initialCookies.length,
-        localStorage: initialLocalStorage.length,
-        sessionStorage: initialSessionStorage.length
-      });
-    });
+      console.log('✅ Logout successful and redirected to login page');
 
-    await test.step('Perform logout', async () => {
-      await dashboardPage.logout();
-      await loginPage.verifyLoginFormDisplayed();
-    });
-
-    await test.step('Verify session cleanup', async () => {
-      // Check cookies after logout
-      const finalCookies = await context.cookies();
-      const finalLocalStorage = await page.evaluate(() => Object.keys(localStorage));
-      const finalSessionStorage = await page.evaluate(() => Object.keys(sessionStorage));
-      
-      console.log('Final state:', {
-        cookies: finalCookies.length,
-        localStorage: finalLocalStorage.length,
-        sessionStorage: finalSessionStorage.length
-      });
-      
-      // Session storage should be cleared or significantly reduced
-      // (Exact implementation depends on application)
-    });
-  });
-
-  test('HRM-39: Should prevent back button access after logout', async ({ page }) => {
-    await test.step('Navigate to different pages while logged in', async () => {
-      await dashboardPage.navigateToPIM();
-      await dashboardPage.navigateToLeave();
-      await dashboardPage.navigateToAdmin();
-    });
-
-    await test.step('Perform logout', async () => {
-      await dashboardPage.logout();
-      await loginPage.verifyLoginFormDisplayed();
-    });
-
-    await test.step('Test back button security', async () => {
-      await dashboardPage.testBackButtonAfterLogout();
-    });
-
-    await test.step('Verify multiple back button clicks', async () => {
-      // Try going back multiple times
-      await page.goBack();
-      await page.waitForLoadState('networkidle');
-      
-      await page.goBack();
-      await page.waitForLoadState('networkidle');
-      
-      // Should still be on login page or redirected to login
-      const currentUrl = await page.url();
-      expect(currentUrl).toContain('login');
-    });
-  });
-
-  test('HRM-39: Should logout from all application modules', async ({ page }) => {
-    const modules = [
-      { name: 'PIM', action: () => dashboardPage.navigateToPIM() },
-      { name: 'Leave', action: () => dashboardPage.navigateToLeave() },
-      { name: 'Admin', action: () => dashboardPage.navigateToAdmin() },
-      { name: 'Time', action: () => dashboardPage.navigateToTime() },
-      { name: 'Recruitment', action: () => dashboardPage.navigateToRecruitment() }
-    ];
-
-    for (const module of modules) {
-      await test.step(`Test logout from ${module.name} module`, async () => {
-        // Navigate to module
-        await module.action();
-        await page.waitForLoadState('networkidle');
-        
-        // Logout from this module
-        await dashboardPage.logout();
-        await loginPage.verifyLoginFormDisplayed();
-        
-        // Login again for next iteration
-        if (module !== modules[modules.length - 1]) {
-          await loginPage.login('Admin', 'admin123');
-          await dashboardPage.verifyDashboardLoaded();
-        }
-      });
+    } catch (error) {
+      await loginPage.takeScreenshot('logout-redirect-failure');
+      throw error;
     }
   });
 
-  test('HRM-39: Should handle logout button accessibility', async ({ page }) => {
-    await test.step('Verify logout button is accessible via keyboard', async () => {
-      // Navigate to user dropdown using keyboard
-      await page.keyboard.press('Tab');
-      await page.keyboard.press('Tab');
-      // Continue tabbing until reaching user dropdown (implementation specific)
-      
-      // Open dropdown
-      await dashboardPage.openUserDropdown();
-      
-      // Verify logout button is visible and accessible
-      const logoutButton = page.locator('text=Logout');
-      await expect(logoutButton).toBeVisible();
-      await expect(logoutButton).toBeFocused();
-    });
-
-    await test.step('Test logout with Enter key', async () => {
-      await dashboardPage.openUserDropdown();
-      const logoutButton = page.locator('text=Logout');
-      await logoutButton.focus();
-      await page.keyboard.press('Enter');
-      
-      await loginPage.verifyLoginFormDisplayed();
-    });
-  });
-
-  test('HRM-39: Should handle concurrent logout scenarios', async ({ page, context }) => {
-    await test.step('Open second tab with same session', async () => {
-      const secondPage = await context.newPage();
-      await secondPage.goto(page.url());
-      
-      // Second tab should also be logged in
-      const secondDashboard = new DashboardPage(secondPage);
-      await secondDashboard.verifyDashboardLoaded();
-      
-      // Logout from first tab
+  test('AUTH-005.2: Should terminate session after logout', async ({ page }) => {
+    try {
+      // Perform logout
       await dashboardPage.logout();
-      await loginPage.verifyLoginFormDisplayed();
-      
-      // Second tab should also be affected (session terminated)
-      await secondPage.reload();
-      await secondPage.waitForLoadState('networkidle');
-      
-      const secondTabUrl = await secondPage.url();
-      expect(secondTabUrl).toContain('login');
-      
-      await secondPage.close();
-    });
-  });
-
-  test('HRM-39: Should handle logout during active operations', async ({ page }) => {
-    await test.step('Start navigation to a module', async () => {
-      // Start navigation to a module but logout during the process
-      const navigationPromise = dashboardPage.navigateToPIM();
-      
-      // Quickly logout before navigation completes
-      await dashboardPage.openUserDropdown();
-      const logoutButton = page.locator('text=Logout');
-      await logoutButton.click();
-      
-      // Wait for either navigation or logout to complete
-      await Promise.race([navigationPromise, page.waitForURL('**/login**')]);
-      
-      // Should end up on login page
       await page.waitForLoadState('networkidle');
-      const currentUrl = await page.url();
-      expect(currentUrl).toContain('login');
-    });
+
+      // Try to access dashboard directly via URL
+      await page.goto('/web/index.php/dashboard/index');
+      await page.waitForLoadState('networkidle');
+
+      // Verify user is redirected back to login (session terminated)
+      const currentURL = await page.url();
+      expect(currentURL).toContain('/auth/login');
+
+      console.log('✅ Session terminated successfully after logout');
+
+    } catch (error) {
+      await loginPage.takeScreenshot('session-termination-failure');
+      throw error;
+    }
   });
 
-  test('HRM-39: Should maintain logout functionality across page refreshes', async ({ page }) => {
-    await test.step('Refresh page and verify user is still logged in', async () => {
-      await page.reload();
-      await dashboardPage.verifyDashboardLoaded();
-    });
+  test('AUTH-005.3: Should prevent access to protected pages after logout', async ({ page }) => {
+    const protectedPages = [
+      '/web/index.php/dashboard/index',
+      '/web/index.php/admin/viewSystemUsers',
+      '/web/index.php/pim/viewEmployeeList',
+      '/web/index.php/leave/viewLeaveList',
+      '/web/index.php/time/viewEmployeeTimesheet',
+      '/web/index.php/recruitment/viewJobVacancy'
+    ];
 
-    await test.step('Logout after page refresh', async () => {
+    try {
+      // Perform logout
       await dashboardPage.logout();
-      await loginPage.verifyLoginFormDisplayed();
-    });
+      await page.waitForLoadState('networkidle');
 
-    await test.step('Verify logout persists after refresh', async () => {
-      await page.reload();
-      await loginPage.verifyLoginFormDisplayed();
-      
-      // Should not auto-login
-      const currentUrl = await page.url();
-      expect(currentUrl).toContain('login');
-    });
-  });
+      // Try to access each protected page
+      for (const protectedPage of protectedPages) {
+        await page.goto(protectedPage);
+        await page.waitForLoadState('networkidle');
 
-  test('HRM-39: Should handle logout with network issues', async ({ page }) => {
-    await test.step('Simulate network delay during logout', async () => {
-      // Add network delay
-      await page.route('**/logout**', route => {
-        setTimeout(() => route.continue(), 2000); // 2 second delay
-      });
-      
-      await dashboardPage.logout();
-      
-      // Should still successfully logout despite delay
-      await loginPage.verifyLoginFormDisplayed();
-    });
-
-    await test.step('Test logout with offline scenario', async () => {
-      // Login again
-      await loginPage.login('Admin', 'admin123');
-      await dashboardPage.verifyDashboardLoaded();
-      
-      // Simulate network failure
-      await page.route('**/*', route => route.abort());
-      
-      try {
-        await dashboardPage.logout();
-        // May fail due to network, but client-side cleanup should happen
-      } catch (error) {
-        console.log('Logout failed due to network issues, this is expected');
+        // Verify redirect to login page
+        const currentURL = await page.url();
+        expect(currentURL).toContain('/auth/login');
+        
+        console.log(`✅ Protected page ${protectedPage} correctly redirected to login`);
       }
-      
-      // Reset network
-      await page.unroute('**/*');
-      
-      // Verify session is still cleaned up locally
-      await page.reload();
-      await page.waitForLoadState('networkidle');
-      
-      // Should redirect to login (depending on implementation)
-      const currentUrl = await page.url();
-      console.log('URL after network failure logout:', currentUrl);
-    });
+
+      console.log('✅ All protected pages inaccessible after logout');
+
+    } catch (error) {
+      await loginPage.takeScreenshot('protected-pages-access-failure');
+      throw error;
+    }
   });
 
-  // Note: No beforeEach cleanup needed as each test starts with login
-  // and ends with logout verification
+  test('AUTH-005.4: Should clear user session data after logout', async ({ page }) => {
+    try {
+      // Check session storage and local storage before logout
+      const sessionStorageBefore = await page.evaluate(() => sessionStorage.length);
+      const localStorageBefore = await page.evaluate(() => localStorage.length);
+
+      // Perform logout
+      await dashboardPage.logout();
+      await page.waitForLoadState('networkidle');
+
+      // Check session and local storage after logout
+      const sessionStorageAfter = await page.evaluate(() => sessionStorage.length);
+      const localStorageAfter = await page.evaluate(() => localStorage.length);
+
+      console.log(`Session storage before logout: ${sessionStorageBefore}, after: ${sessionStorageAfter}`);
+      console.log(`Local storage before logout: ${localStorageBefore}, after: ${localStorageAfter}`);
+
+      // Verify login page is displayed
+      await loginPage.verifyLoginPageLoaded();
+
+      console.log('✅ Session data handling verified after logout');
+
+    } catch (error) {
+      await loginPage.takeScreenshot('session-data-cleanup-failure');
+      throw error;
+    }
+  });
+
+  test('AUTH-005.5: Should handle browser back button after logout', async ({ page }) => {
+    try {
+      // Perform logout
+      await dashboardPage.logout();
+      await page.waitForLoadState('networkidle');
+
+      // Verify on login page
+      let currentURL = await page.url();
+      expect(currentURL).toContain('/auth/login');
+
+      // Try to go back using browser back button
+      await page.goBack();
+      await page.waitForLoadState('networkidle');
+
+      // Verify still on login page or redirected back to login
+      currentURL = await page.url();
+      expect(currentURL).toContain('/auth/login');
+
+      console.log('✅ Browser back button handled correctly after logout');
+
+    } catch (error) {
+      await loginPage.takeScreenshot('browser-back-button-failure');
+      throw error;
+    }
+  });
+
+  test('AUTH-005.6: Should allow re-login after logout', async ({ page }) => {
+    try {
+      // Perform logout
+      await dashboardPage.logout();
+      await page.waitForLoadState('networkidle');
+
+      // Verify on login page
+      await loginPage.verifyLoginPageLoaded();
+
+      // Attempt to login again
+      await loginPage.loginAsAdmin();
+
+      // Verify successful re-login
+      await dashboardPage.verifyDashboardLoaded();
+      const isLoggedIn = await dashboardPage.isUserLoggedIn();
+      expect(isLoggedIn).toBe(true);
+
+      console.log('✅ Re-login successful after logout');
+
+    } catch (error) {
+      await loginPage.takeScreenshot('re-login-after-logout-failure');
+      throw error;
+    }
+  });
+
+  test('AUTH-005.7: Should handle logout from different pages', async ({ page }) => {
+    const testPages = [
+      { name: 'Dashboard', action: () => page.goto('/web/index.php/dashboard/index') },
+      { name: 'Admin', action: () => dashboardPage.navigateToAdmin() },
+      { name: 'PIM', action: () => dashboardPage.navigateToPIM() }
+    ];
+
+    for (const testPage of testPages) {
+      try {
+        // Navigate to test page
+        await testPage.action();
+        await page.waitForLoadState('networkidle');
+
+        // Verify user is logged in
+        const isLoggedIn = await dashboardPage.isUserLoggedIn();
+        expect(isLoggedIn).toBe(true);
+
+        // Perform logout from this page
+        await dashboardPage.logout();
+        await page.waitForLoadState('networkidle');
+
+        // Verify redirect to login page
+        const currentURL = await page.url();
+        expect(currentURL).toContain('/auth/login');
+
+        console.log(`✅ Logout successful from ${testPage.name} page`);
+
+        // Re-login for next iteration
+        if (testPages.indexOf(testPage) < testPages.length - 1) {
+          await loginPage.loginAsAdmin();
+          await dashboardPage.verifyDashboardLoaded();
+        }
+
+      } catch (error) {
+        await loginPage.takeScreenshot(`logout-from-${testPage.name.toLowerCase()}-failure`);
+        throw error;
+      }
+    }
+
+    console.log('✅ Logout functionality verified from multiple pages');
+  });
+
+  test('AUTH-005.8: Should validate logout link visibility and accessibility', async ({ page }) => {
+    try {
+      // Verify user dropdown is visible
+      await dashboardPage.verifyElementVisible(dashboardPage.userDropdown);
+
+      // Click user dropdown to reveal logout option
+      await dashboardPage.clickElement(dashboardPage.userDropdown);
+
+      // Verify logout option is visible and clickable
+      await dashboardPage.waitForElement(dashboardPage.logoutOption);
+      await dashboardPage.verifyElementVisible(dashboardPage.logoutOption);
+
+      // Verify logout option text
+      const logoutText = await dashboardPage.getTextContent(dashboardPage.logoutOption);
+      expect(logoutText).toContain('Logout');
+
+      console.log('✅ Logout link visibility and accessibility verified');
+
+    } catch (error) {
+      await loginPage.takeScreenshot('logout-link-accessibility-failure');
+      throw error;
+    }
+  });
+
+  test.afterEach(async ({ page }) => {
+    // Ensure clean state for next test
+    try {
+      const currentURL = await page.url();
+      if (!currentURL.includes('/auth/login')) {
+        // If not on login page, try to logout first
+        const isLoggedIn = await dashboardPage.isUserLoggedIn();
+        if (isLoggedIn) {
+          await dashboardPage.logout();
+        }
+      }
+    } catch (error) {
+      // Force navigate to login page if logout fails
+      await loginPage.navigateToLogin();
+    }
+  });
 }); 

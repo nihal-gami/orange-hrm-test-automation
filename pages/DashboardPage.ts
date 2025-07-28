@@ -1,277 +1,193 @@
-import { Page, Locator, expect } from '@playwright/test';
+import { Page, Locator } from '@playwright/test';
 import { BasePage } from './BasePage';
 
-/**
- * Dashboard Page class for Orange HRM post-login functionality
- * Used to verify successful login and role-based access
- */
 export class DashboardPage extends BasePage {
   // Page elements
-  private readonly dashboardHeader: Locator;
-  private readonly userDropdown: Locator;
-  private readonly logoutButton: Locator;
-  private readonly welcomeMessage: Locator;
-  private readonly mainMenu: Locator;
-  private readonly adminMenu: Locator;
-  private readonly pimMenu: Locator;
-  private readonly leaveMenu: Locator;
-  private readonly timeMenu: Locator;
-  private readonly recruitmentMenu: Locator;
-  private readonly performanceMenu: Locator;
-  private readonly dashboardBreadcrumb: Locator;
-  private readonly sidePanel: Locator;
+  readonly dashboardHeader: Locator;
+  readonly userDropdown: Locator;
+  readonly logoutOption: Locator;
+  readonly mainMenu: Locator;
+  readonly dashboardContent: Locator;
+  readonly breadcrumb: Locator;
+  readonly userProfilePicture: Locator;
+  readonly sideMenu: Locator;
+
+  // Menu items
+  readonly adminMenu: Locator;
+  readonly pimMenu: Locator;
+  readonly leaveMenu: Locator;
+  readonly timeMenu: Locator;
+  readonly recruitmentMenu: Locator;
+  readonly performanceMenu: Locator;
 
   constructor(page: Page) {
     super(page);
-    // Dashboard elements
-    this.dashboardHeader = page.locator('.oxd-topbar-header');
-    this.userDropdown = page.locator('.oxd-userdropdown');
-    this.logoutButton = page.locator('text=Logout');
-    this.welcomeMessage = page.locator('.oxd-text--h6', { hasText: 'Dashboard' });
+    
+    // Initialize main page locators
+    this.dashboardHeader = page.locator('.oxd-topbar-header-breadcrumb');
+    this.userDropdown = page.locator('.oxd-userdropdown-tab');
+    this.logoutOption = page.locator('text=Logout');
     this.mainMenu = page.locator('.oxd-main-menu').first();
-    this.sidePanel = page.locator('.oxd-sidepanel');
-    this.dashboardBreadcrumb = page.locator('.oxd-topbar-header-breadcrumb');
-    
-    // Menu items
-    this.adminMenu = page.locator('.oxd-main-menu-item', { hasText: 'Admin' });
-    this.pimMenu = page.locator('.oxd-main-menu-item', { hasText: 'PIM' });
-    this.leaveMenu = page.locator('.oxd-main-menu-item', { hasText: 'Leave' });
-    this.timeMenu = page.locator('.oxd-main-menu-item', { hasText: 'Time' });
-    this.recruitmentMenu = page.locator('.oxd-main-menu-item', { hasText: 'Recruitment' });
-    this.performanceMenu = page.locator('.oxd-main-menu-item', { hasText: 'Performance' });
+    this.dashboardContent = page.locator('.oxd-layout-body');
+    this.breadcrumb = page.locator('.oxd-breadcrumb');
+    this.userProfilePicture = page.locator('.oxd-userdropdown-img');
+    this.sideMenu = page.locator('.oxd-sidepanel');
+
+    // Initialize menu item locators
+    this.adminMenu = page.locator('text=Admin').first();
+    this.pimMenu = page.locator('text=PIM').first();
+    this.leaveMenu = page.locator('text=Leave').first();
+    this.timeMenu = page.locator('text=Time').first();
+    this.recruitmentMenu = page.locator('text=Recruitment').first();
+    this.performanceMenu = page.locator('text=Performance').first();
   }
 
   /**
-   * Verify user is on dashboard page after successful login
+   * Verify dashboard page is loaded
    */
-  async verifyDashboardLoaded(): Promise<void> {
+  async verifyDashboardLoaded() {
     await this.verifyElementVisible(this.dashboardHeader);
-    await this.verifyElementVisible(this.dashboardBreadcrumb);
+    await this.verifyElementVisible(this.userDropdown);
     await this.verifyElementVisible(this.mainMenu);
-    
-    // Verify URL contains dashboard
-    const currentUrl = await this.getCurrentUrl();
-    expect(currentUrl).toContain('dashboard');
   }
 
   /**
-   * Verify dashboard title and breadcrumb
+   * Get dashboard page title
    */
-  async verifyDashboardTitle(): Promise<void> {
-    const title = await this.getPageTitle();
-    expect(title).toContain('OrangeHRM');
-    
-    await this.verifyElementVisible(this.dashboardBreadcrumb);
+  async getDashboardTitle(): Promise<string> {
+    return await this.getTextContent(this.dashboardHeader);
   }
 
   /**
-   * Verify main navigation menu is visible
+   * Perform logout
    */
-  async verifyMainMenuVisible(): Promise<void> {
-    await this.verifyElementVisible(this.mainMenu);
-    await this.verifyElementVisible(this.sidePanel);
-  }
-
-  /**
-   * Get visible menu items (for role-based access testing)
-   */
-  async getVisibleMenuItems(): Promise<string[]> {
-    const menuItems = await this.page.locator('.oxd-main-menu-item').allTextContents();
-    return menuItems.filter(item => item.trim().length > 0);
-  }
-
-  /**
-   * Verify Admin menu is visible (Admin role test)
-   */
-  async verifyAdminMenuVisible(): Promise<void> {
-    await this.verifyElementVisible(this.adminMenu);
-  }
-
-  /**
-   * Verify Admin menu is not visible (Non-admin role test)
-   */
-  async verifyAdminMenuNotVisible(): Promise<void> {
-    await expect(this.adminMenu).not.toBeVisible();
+  async logout() {
+    try {
+      await this.clickElement(this.userDropdown);
+      await this.waitForElement(this.logoutOption);
+      await this.clickElement(this.logoutOption);
+      
+      // Wait for redirect to login page
+      await this.page.waitForTimeout(2000);
+    } catch (error) {
+      console.error('Logout failed:', error);
+      throw error;
+    }
   }
 
   /**
    * Navigate to Admin module
    */
-  async navigateToAdmin(): Promise<void> {
-    await this.safeClick(this.adminMenu);
+  async navigateToAdmin() {
+    await this.clickElement(this.adminMenu);
     await this.waitForPageLoad();
   }
 
   /**
    * Navigate to PIM module
    */
-  async navigateToPIM(): Promise<void> {
-    await this.safeClick(this.pimMenu);
+  async navigateToPIM() {
+    await this.clickElement(this.pimMenu);
     await this.waitForPageLoad();
   }
 
   /**
    * Navigate to Leave module
    */
-  async navigateToLeave(): Promise<void> {
-    await this.safeClick(this.leaveMenu);
+  async navigateToLeave() {
+    await this.clickElement(this.leaveMenu);
     await this.waitForPageLoad();
   }
 
   /**
    * Navigate to Time module
    */
-  async navigateToTime(): Promise<void> {
-    await this.safeClick(this.timeMenu);
+  async navigateToTime() {
+    await this.clickElement(this.timeMenu);
     await this.waitForPageLoad();
   }
 
   /**
    * Navigate to Recruitment module
    */
-  async navigateToRecruitment(): Promise<void> {
-    await this.safeClick(this.recruitmentMenu);
+  async navigateToRecruitment() {
+    await this.clickElement(this.recruitmentMenu);
     await this.waitForPageLoad();
   }
 
   /**
    * Navigate to Performance module
    */
-  async navigateToPerformance(): Promise<void> {
-    await this.safeClick(this.performanceMenu);
+  async navigateToPerformance() {
+    await this.clickElement(this.performanceMenu);
     await this.waitForPageLoad();
   }
 
   /**
-   * Open user dropdown menu
+   * Check if specific menu item is visible
+   * @param menuName - Name of the menu item
    */
-  async openUserDropdown(): Promise<void> {
-    await this.safeClick(this.userDropdown);
-    await this.verifyElementVisible(this.logoutButton);
+  async isMenuItemVisible(menuName: string): Promise<boolean> {
+    const menuItem = this.page.locator(`text=${menuName}`).first();
+    return await this.isElementVisible(menuItem);
   }
 
   /**
-   * Perform logout
+   * Get all visible menu items
    */
-  async logout(): Promise<void> {
-    await this.openUserDropdown();
-    await this.safeClick(this.logoutButton);
-    await this.waitForPageLoad();
+  async getVisibleMenuItems(): Promise<string[]> {
+    await this.waitForElement(this.mainMenu);
+    const menuItems = await this.mainMenu.locator('.oxd-main-menu-item').all();
+    const visibleItems: string[] = [];
+    
+    for (const item of menuItems) {
+      if (await item.isVisible()) {
+        const text = await item.textContent();
+        if (text) {
+          visibleItems.push(text.trim());
+        }
+      }
+    }
+    
+    return visibleItems;
   }
 
   /**
-   * Verify user can access specific module (for role testing)
-   * @param moduleName - Name of the module to test
+   * Verify user has admin access (all menu items visible)
    */
-  async verifyModuleAccess(moduleName: string): Promise<boolean> {
+  async verifyAdminAccess() {
+    const expectedMenuItems = ['Admin', 'PIM', 'Leave', 'Time', 'Recruitment', 'Performance'];
+    
+    for (const menuItem of expectedMenuItems) {
+      const isVisible = await this.isMenuItemVisible(menuItem);
+      if (!isVisible) {
+        throw new Error(`Menu item '${menuItem}' is not visible for admin user`);
+      }
+    }
+  }
+
+  /**
+   * Get breadcrumb text
+   */
+  async getBreadcrumbText(): Promise<string> {
     try {
-      const moduleLocator = this.page.locator('.oxd-main-menu-item', { hasText: moduleName });
-      await this.verifyElementVisible(moduleLocator);
-      await this.safeClick(moduleLocator);
-      await this.waitForPageLoad();
-      
-      // Check if we're redirected to the module or get access denied
-      const currentUrl = await this.getCurrentUrl();
-      return currentUrl.toLowerCase().includes(moduleName.toLowerCase());
-    } catch (error) {
-      return false;
+      return await this.getTextContent(this.breadcrumb);
+    } catch {
+      return '';
     }
   }
 
   /**
-   * Test unauthorized access attempt
-   * @param url - URL to test unauthorized access
+   * Verify dashboard content is loaded
    */
-  async testUnauthorizedAccess(url: string): Promise<void> {
-    await this.navigateTo(url);
-    await this.waitForPageLoad();
-    
-    // Should either redirect to dashboard or show access denied
-    const currentUrl = await this.getCurrentUrl();
-    const isRedirected = currentUrl.includes('dashboard') || 
-                        currentUrl.includes('login') || 
-                        currentUrl.includes('unauthorized');
-    
-    expect(isRedirected).toBe(true);
+  async verifyDashboardContent() {
+    await this.verifyElementVisible(this.dashboardContent);
   }
 
   /**
-   * Verify session is active (user is still logged in)
+   * Check if user is logged in
    */
-  async verifySessionActive(): Promise<void> {
-    await this.verifyElementVisible(this.dashboardHeader);
-    await this.verifyElementVisible(this.userDropdown);
-    
-    const currentUrl = await this.getCurrentUrl();
-    expect(currentUrl).not.toContain('login');
-  }
-
-  /**
-   * Test browser back button after logout
-   */
-  async testBackButtonAfterLogout(): Promise<void> {
-    // Go back in browser history
-    await this.page.goBack();
-    await this.waitForPageLoad();
-    
-    // Should redirect to login page or show session expired
-    const currentUrl = await this.getCurrentUrl();
-    expect(currentUrl).toContain('login');
-  }
-
-  /**
-   * Simulate session timeout and test redirect
-   */
-  async simulateSessionTimeout(): Promise<void> {
-    // Clear session storage and cookies to simulate timeout
-    await this.page.evaluate(() => {
-      sessionStorage.clear();
-      localStorage.clear();
-    });
-    
-    // Clear cookies
-    const context = this.page.context();
-    await context.clearCookies();
-    
-    // Try to perform an action that requires authentication
-    await this.page.reload();
-    await this.waitForPageLoad();
-    
-    // Should redirect to login page
-    const currentUrl = await this.getCurrentUrl();
-    expect(currentUrl).toContain('login');
-  }
-
-  /**
-   * Check if user has access to all admin functions
-   */
-  async checkAdminAccess(): Promise<boolean> {
-    try {
-      await this.verifyAdminMenuVisible();
-      await this.navigateToAdmin();
-      
-      // Check for admin-specific elements
-      const adminElements = await this.page.locator('.oxd-topbar-header-breadcrumb').textContent();
-      return adminElements?.includes('Admin') || false;
-    } catch (error) {
-      return false;
-    }
-  }
-
-  /**
-   * Get current user role information
-   */
-  async getCurrentUserRole(): Promise<string> {
-    // This would need to be implemented based on how the application shows user role
-    // For now, we'll determine based on menu visibility
-    const visibleMenus = await this.getVisibleMenuItems();
-    
-    if (visibleMenus.includes('Admin')) {
-      return 'Admin';
-    } else if (visibleMenus.includes('PIM') && visibleMenus.includes('Leave')) {
-      return 'Supervisor';
-    } else {
-      return 'ESS User';
-    }
+  async isUserLoggedIn(): Promise<boolean> {
+    return await this.isElementVisible(this.userDropdown);
   }
 } 

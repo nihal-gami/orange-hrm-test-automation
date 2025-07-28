@@ -1,66 +1,73 @@
 import { defineConfig, devices } from '@playwright/test';
 
-/**
- * @see https://playwright.dev/docs/test-configuration
- */
 export default defineConfig({
+  // Test directory
   testDir: './tests',
-  /* Run tests in files in parallel */
+  
+  // Run tests in files in parallel
   fullyParallel: true,
-  /* Fail the build on CI if you accidentally left test.only in the source code. */
+  
+  // Fail the build on CI if you accidentally left test.only in the source code
   forbidOnly: !!process.env.CI,
-  /* Retry on CI only */
+  
+  // Retry on CI only
   retries: process.env.CI ? 2 : 0,
-  /* Opt out of parallel tests on CI. */
+  
+  // Opt out of parallel tests on CI
   workers: process.env.CI ? 1 : undefined,
-  /* Reporter to use. See https://playwright.dev/docs/test-reporters */
+  
+  // Reporter to use
   reporter: [
-    ['html', { outputFolder: 'test-results/html-report' }],
+    ['html'],
     ['json', { outputFile: 'test-results/results.json' }],
-    ['junit', { outputFile: 'test-results/junit.xml' }]
+    ['junit', { outputFile: 'test-results/results.xml' }]
   ],
-  /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
+  
+  // Shared settings for all the projects below
   use: {
-    /* Base URL to use in actions like `await page.goto('/')`. */
+    // Base URL to use in actions like `await page.goto('/')`
     baseURL: 'https://opensource-demo.orangehrmlive.com',
     
-    /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
+    // Collect trace when retrying the failed test
     trace: 'on-first-retry',
     
-    /* Screenshot on failure */
+    // Take screenshot on failure
     screenshot: 'only-on-failure',
     
-    /* Video recording */
+    // Record video on failure
     video: 'retain-on-failure',
     
-    /* Global timeout for each test */
-    actionTimeout: 30000,
-    navigationTimeout: 30000,
+    // Global timeout for all actions
+    actionTimeout: 15000,
+    
+    // Global timeout for navigation
+    navigationTimeout: 30000
   },
 
-  /* Configure projects for major browsers */
+  // Configure projects for major browsers - Chrome only as per automation standards
   projects: [
     {
-      name: 'chrome',
+      name: 'chromium',
       use: { 
         ...devices['Desktop Chrome'],
-        // Following automation rules: Chrome browser only
-        viewport: { width: 1920, height: 1080 }
+        // Additional Chrome-specific settings
+        viewport: { width: 1920, height: 1080 },
+        ignoreHTTPSErrors: true
       },
-    },
+    }
   ],
 
-  /* Output directories */
-  outputDir: 'test-results/artifacts',
+  // Global setup file
+  globalSetup: './tests/setup/global-setup.ts',
+
+  // Configure test output directory
+  outputDir: 'test-results/',
   
-  /* Global setup and teardown */
-  globalSetup: require.resolve('./tests/setup/global-setup.ts'),
-  
-  /* Test timeout */
+  // Configure test timeout
   timeout: 60000,
   
-  /* Expect timeout */
+  // Configure expect timeout
   expect: {
     timeout: 10000
-  },
+  }
 }); 

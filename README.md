@@ -1,359 +1,259 @@
-# Orange HRM Demo - Authentication Test Automation Suite
+# Orange HRM Demo - Test Automation Suite 🚀
 
-🔐 Comprehensive test automation suite for Orange HRM Demo authentication and authorization functionality.
+[![Playwright Tests](https://github.com/your-org/orange-hrm-automation/actions/workflows/playwright.yml/badge.svg)](https://github.com/your-org/orange-hrm-automation/actions/workflows/playwright.yml)
+
+A comprehensive end-to-end test automation suite for the Orange HRM Demo application, built with Playwright and TypeScript following the Page Object Model pattern.
 
 ## 📋 Project Overview
 
-This project implements automated testing for the Orange HRM Demo application, specifically focusing on authentication and authorization scenarios. The test suite is designed following industry best practices and covers all critical security aspects.
+This project implements automated testing for the Orange HRM Demo application authentication and authorization workflows. The test suite covers critical security scenarios and user access control validation.
 
-### 🎯 Epic & User Stories
+**Application Under Test**: [Orange HRM Demo](https://opensource-demo.orangehrmlive.com/)
 
-**Epic**: [HRM-34] 🔐 Authentication & Authorization
+### 🎯 Test Coverage
 
-**Covered Jira Tasks**:
-- **HRM-35**: Valid Login Test - Correct Credentials
-- **HRM-36**: Invalid Login Tests - Multiple Scenarios
-- **HRM-37**: Password Field Masking Test
-- **HRM-38**: Role-Based Access Control Tests
-- **HRM-39**: Logout Functionality Test
-- **HRM-40**: Session Timeout Test
+#### 🔐 Authentication & Authorization Epic (HRM-41)
+
+| Jira Task | Test Scenario | Status |
+|-----------|---------------|--------|
+| HRM-42 | Valid Login Test Automation | ✅ Implemented |
+| HRM-43 | Invalid Login Attempts Test Automation | ✅ Implemented |
+| HRM-44 | Password Field Masking Test Automation | ✅ Implemented |
+| HRM-45 | Role-Based Access Control Test Automation | ✅ Implemented |
+| HRM-46 | Logout Functionality Test Automation | ✅ Implemented |
 
 ## 🛠️ Technology Stack
 
-- **Framework**: Playwright with TypeScript
-- **Browser**: Chrome (as per automation rules)
+- **Framework**: Playwright
+- **Language**: TypeScript
 - **Pattern**: Page Object Model (POM)
+- **Browser**: Chrome (as per automation standards)
 - **CI/CD**: GitHub Actions
-- **Reporting**: HTML, JSON, JUnit reports
-
-## 🚀 Quick Start
-
-### Prerequisites
-
-- Node.js (version 18 or higher)
-- npm or yarn package manager
-- Chrome browser
-
-### Installation
-
-```bash
-# Clone the repository
-git clone <repository-url>
-cd orange-hrm-automation
-
-# Install dependencies
-npm install
-
-# Install Playwright browsers
-npx playwright install chrome
-```
-
-### Running Tests
-
-```bash
-# Run all authentication tests
-npm test
-
-# Run tests in headed mode (visible browser)
-npm run test:headed
-
-# Run tests with UI mode for debugging
-npm run test:ui
-
-# Run specific test suite
-npm run test:auth
-
-# Generate and view test report
-npm run test:report
-```
+- **Reporting**: HTML, JSON, JUnit
 
 ## 📁 Project Structure
 
 ```
-orange-hrm-automation/
+orange-hrm-test-automation/
 ├── pages/                          # Page Object Model classes
-│   ├── BasePage.ts                 # Base page with common functionality
-│   ├── LoginPage.ts                # Login page interactions
-│   └── DashboardPage.ts            # Dashboard and navigation
-├── tests/                          # Test specifications
-│   ├── auth/                       # Authentication test suites
-│   │   ├── valid-login.test.ts     # HRM-35: Valid login tests
-│   │   ├── invalid-login.test.ts   # HRM-36: Invalid login scenarios
-│   │   ├── password-masking.test.ts # HRM-37: Password security tests
-│   │   ├── role-based-access.test.ts # HRM-38: Role-based access tests
-│   │   ├── logout.test.ts          # HRM-39: Logout functionality
-│   │   └── session-timeout.test.ts # HRM-40: Session timeout tests
-│   ├── data/                       # Test data and configurations
-│   │   └── auth-test-data.ts       # Authentication test data
-│   └── setup/                      # Global test setup
-│       └── global-setup.ts         # Environment verification
-├── test-results/                   # Test execution results
-│   ├── html-report/               # HTML test reports
-│   ├── screenshots/               # Failure screenshots
-│   └── artifacts/                 # Test artifacts
-├── .github/workflows/             # CI/CD pipelines
-│   └── playwright.yml             # GitHub Actions workflow
+│   ├── BasePage.ts                # Base page with common functionality
+│   ├── LoginPage.ts               # Login page interactions
+│   └── DashboardPage.ts           # Dashboard page interactions
+├── tests/                         # Test files
+│   ├── auth/                      # Authentication test suites
+│   │   ├── valid-login.test.ts    # HRM-42: Valid login tests
+│   │   ├── invalid-login.test.ts  # HRM-43: Invalid login tests
+│   │   ├── password-masking.test.ts # HRM-44: Password security tests
+│   │   ├── role-based-access.test.ts # HRM-45: Access control tests
+│   │   └── logout.test.ts         # HRM-46: Logout functionality tests
+│   ├── data/                      # Test data files
+│   │   └── auth-test-data.ts      # Authentication test data
+│   └── setup/                     # Test configuration
+│       └── global-setup.ts        # Global test setup
+├── test-results/                  # Test execution results
 ├── playwright.config.ts           # Playwright configuration
 ├── package.json                   # Project dependencies
-└── README.md                      # Project documentation
+└── tsconfig.json                  # TypeScript configuration
 ```
 
-## 🧪 Test Coverage
+## 🚀 Getting Started
 
-### Authentication Scenarios
+### Prerequisites
 
-#### ✅ Valid Login (HRM-35)
-- Successful login with correct credentials
-- Session persistence across navigation
-- Admin role verification
-- Network resilience testing
+- Node.js (v18 or higher)
+- npm or yarn package manager
 
-#### ❌ Invalid Login (HRM-36)
-- Invalid username/password combinations
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd orange-hrm-test-automation
+   ```
+
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
+
+3. **Install Playwright browsers**
+   ```bash
+   npm run install:browsers
+   ```
+
+### Running Tests
+
+#### Execute All Tests
+```bash
+npm test
+```
+
+#### Execute Authentication Tests Only
+```bash
+npm run test:auth
+```
+
+#### Execute Tests in Headed Mode
+```bash
+npm run test:headed
+```
+
+#### Debug Tests
+```bash
+npm run test:debug
+```
+
+#### Interactive UI Mode
+```bash
+npm run test:ui
+```
+
+#### Chrome-Only Execution
+```bash
+npm run test:chrome
+```
+
+### View Test Reports
+```bash
+npm run report
+```
+
+## 📊 Test Scenarios
+
+### 🔑 Valid Login Tests (HRM-42)
+- Successful login with Admin credentials
+- Dashboard elements verification
+- Session maintenance validation
+
+### ❌ Invalid Login Tests (HRM-43)
+- Invalid username scenarios
+- Invalid password scenarios
 - Empty field validation
-- SQL injection prevention
-- XSS attack prevention
-- Edge case handling (long strings, special characters)
+- Multiple consecutive attempts
+- Error message validation
 
-#### 🔒 Password Masking (HRM-37)
-- Password field type verification
-- Visual masking confirmation
-- Security attribute validation
-- Copy-paste operation security
-- JavaScript manipulation prevention
+### 🔒 Password Security Tests (HRM-44)
+- Password field masking verification
+- DOM exposure prevention
+- Copy-paste security handling
+- Form interaction security
 
-#### 👥 Role-Based Access (HRM-38)
-- Admin role full access verification
-- Module-specific permissions
-- Unauthorized URL access prevention
-- Menu visibility based on role
-- Data access restrictions
+### 👤 Role-Based Access Tests (HRM-45)
+- Admin user full system access
+- Module-specific access validation
+- Navigation permissions consistency
 
-#### 🚪 Logout Functionality (HRM-39)
+### 🚪 Logout Functionality Tests (HRM-46)
 - Successful logout and redirect
-- Session cleanup verification
-- Back button security
-- Multi-tab logout handling
-- Network issue resilience
+- Session termination validation
+- Protected page access prevention
+- Browser back button handling
+- Re-login capability
 
-#### ⏱️ Session Timeout (HRM-40)
-- Session timeout simulation
-- Inactive session handling
-- Multi-tab session management
-- AJAX request timeout handling
-- Session extension on activity
+## 🎨 Automation Standards
+
+### Design Principles
+- **Page Object Model**: Maintainable test structure
+- **Data-Driven Testing**: External data sources for test inputs
+- **Dynamic Waits**: No hardcoded sleeps, robust wait mechanisms
+- **Error Handling**: Comprehensive try-catch blocks
+- **Chrome-Only**: Single browser execution as per standards
+
+### Security Testing Features
+- SQL Injection validation readiness
+- XSS vulnerability testing capabilities
+- Password security validation
+- Session management verification
+
+### Best Practices
+- Comprehensive error handling
+- Screenshot capture on failures
+- Detailed logging and reporting
+- Clean test data management
+- Parallel test execution support
 
 ## 🔧 Configuration
 
-### Environment Variables
+### Test Environment
+- **Base URL**: https://opensource-demo.orangehrmlive.com
+- **Browser**: Chrome (Desktop)
+- **Viewport**: 1920x1080
+- **Timeout**: 60 seconds per test
+- **Retries**: 2 on CI, 0 locally
 
-Create a `.env` file for environment-specific configurations:
+### Credentials
+- **Username**: Admin
+- **Password**: admin123
 
-```env
-# Test Environment
-BASE_URL=https://opensource-demo.orangehrmlive.com
-DEFAULT_USERNAME=Admin
-DEFAULT_PASSWORD=admin123
+## 📈 Reporting
 
-# Test Execution
-HEADLESS=true
-TIMEOUT=30000
-RETRIES=2
-
-# Reporting
-REPORT_PATH=./test-results
-SCREENSHOT_ON_FAILURE=true
-```
-
-### Browser Configuration
-
-Following workspace automation rules, tests run exclusively on Chrome:
-
-```typescript
-// playwright.config.ts
-projects: [
-  {
-    name: 'chrome',
-    use: { 
-      ...devices['Desktop Chrome'],
-      viewport: { width: 1920, height: 1080 }
-    },
-  },
-]
-```
-
-## 📊 Reporting & Analytics
-
-### Test Reports
-
+The test suite generates multiple report formats:
 - **HTML Report**: Interactive test results with screenshots
-- **JSON Report**: Structured data for integration
-- **JUnit Report**: CI/CD compatibility
-
-### Key Metrics Tracked
-
-- Test execution time
-- Pass/fail rates
-- Coverage percentage
-- Browser performance
-- Security vulnerability detection
+- **JSON Report**: Machine-readable test results
+- **JUnit XML**: CI/CD integration compatible format
 
 ## 🔄 CI/CD Integration
 
 ### GitHub Actions Workflow
+- Automated test execution on pull requests
+- Single execution node for consistency
+- Artifact collection for test results
+- Automatic browser installation
 
-```yaml
-# Automated execution on:
-- Push to main/feature branches
-- Pull requests
-- Daily scheduled runs (2 AM UTC)
-- Manual triggers
-```
+### Pre-commit Checks
+- Playwright tests must pass locally before PR submission
+- Code formatting with Prettier (2-space indentation)
+- TypeScript compilation validation
 
-### Pull Request Integration
+## 📝 Contributing
 
-- Automatic test execution on PR creation
-- Test results commented on PR
-- GitHub Copilot assigned as reviewer
-- Jira ticket linking in PR description
+### Pull Request Guidelines
+1. **Jira Integration**: Include Jira ticket key in PR title and description
+2. **Format**: `[JIRA_KEY] Brief description of changes`
+3. **Testing**: Ensure all tests pass locally before submission
+4. **Review**: Assign at least one reviewer and GitHub Co-pilot
+5. **Documentation**: Update test documentation as needed
 
-## 🛡️ Security Testing
+### Code Standards
+- Follow existing TypeScript patterns
+- Maintain Page Object Model structure
+- Include comprehensive test documentation
+- Use descriptive test names and assertions
 
-### Implemented Security Checks
-
-- **SQL Injection**: Multiple payload testing
-- **XSS Prevention**: Cross-site scripting attempts
-- **Session Security**: Timeout and cleanup validation
-- **Access Control**: Role-based permission verification
-- **Password Security**: Field masking and protection
-
-### Security Test Data
-
-```typescript
-// Example SQL injection payloads
-sqlInjectionPayloads: [
-  "'; DROP TABLE users; --",
-  "' OR '1'='1",
-  "' UNION SELECT * FROM users --"
-]
-
-// Example XSS payloads
-xssPayloads: [
-  '<script>alert("XSS")</script>',
-  'javascript:alert("XSS")',
-  '<img src="x" onerror="alert(\'XSS\')">'
-]
-```
-
-## 📈 Best Practices Implemented
-
-### Code Quality
-- TypeScript for type safety
-- ESLint for code standards
-- Page Object Model pattern
-- Data-driven testing approach
-
-### Test Design
-- Robust error handling
-- Dynamic waits over fixed delays
-- Comprehensive assertions
-- Screenshot capture on failures
-
-### Maintenance
-- Modular test structure
-- Reusable page components
-- Centralized test data
-- Clear documentation
-
-## 🐛 Troubleshooting
+## 🆘 Troubleshooting
 
 ### Common Issues
 
-#### Tests Failing to Start
+#### Browser Installation
 ```bash
-# Ensure browsers are installed
-npx playwright install chrome
-
-# Check Node.js version
-node --version  # Should be 18+
+npx playwright install chromium
 ```
 
-#### Login Issues
-```bash
-# Verify Orange HRM demo is accessible
-curl -I https://opensource-demo.orangehrmlive.com
+#### Test Timeout Issues
+- Increase timeout in `playwright.config.ts`
+- Check network connectivity to Orange HRM demo
 
-# Check credentials in test data
-# Default: Admin / admin123
-```
+#### Page Load Issues
+- Verify Orange HRM demo accessibility
+- Check global setup configuration
 
-#### Timeout Errors
-```bash
-# Increase timeout in playwright.config.ts
-timeout: 60000  # 60 seconds
+## 📚 Resources
 
-# Or for specific tests
-test.setTimeout(120000);  # 2 minutes
-```
+- [Playwright Documentation](https://playwright.dev/)
+- [Orange HRM Demo](https://opensource-demo.orangehrmlive.com/)
+- [TypeScript Documentation](https://www.typescriptlang.org/)
+- [Page Object Model Pattern](https://playwright.dev/docs/pom)
 
-### Debugging Tests
+## 📧 Support
 
-```bash
-# Run in debug mode
-npm run test:debug
-
-# Run with UI mode
-npm run test:ui
-
-# Run specific test file
-npx playwright test tests/auth/valid-login.test.ts --debug
-```
-
-## 🤝 Contributing
-
-### Development Workflow
-
-1. Create feature branch from `main`
-2. Implement tests following POM pattern
-3. Ensure all tests pass locally
-4. Create PR with Jira ticket reference
-5. Assign GitHub Copilot as reviewer
-6. Merge after approval and green tests
-
-### Coding Standards
-
-- Follow TypeScript best practices
-- Use meaningful test descriptions
-- Include proper error handling
-- Add comments for complex logic
-- Update documentation for new features
-
-## 📞 Support & Contact
-
-### Team Information
-- **Maintainer**: Test Automation Team
-- **Epic Owner**: Product Owner
-- **Jira Project**: HRM (test automation)
-
-### Resources
-- **Orange HRM Demo**: https://opensource-demo.orangehrmlive.com
-- **Playwright Docs**: https://playwright.dev
-- **Project Wiki**: [Internal wiki link]
+For questions or issues:
+- Create an issue in the repository
+- Contact the Test Automation Team
+- Refer to Confluence documentation
 
 ---
 
-## 📋 Test Execution Checklist
-
-- [ ] ✅ Valid login functionality verified
-- [ ] ❌ Invalid login scenarios covered
-- [ ] 🔒 Password masking security confirmed
-- [ ] 👥 Role-based access tested
-- [ ] 🚪 Logout functionality validated
-- [ ] ⏱️ Session timeout handling verified
-- [ ] 📊 Test reports generated
-- [ ] 🔄 CI/CD pipeline successful
-- [ ] 📝 PR documentation updated
-
-*Last Updated: January 2025*  
-*Framework: Playwright v1.41.0*  
-*Browser: Chrome (Latest)* 
+**Last Updated**: January 2025  
+**Maintainer**: Test Automation Team  
+**Project**: Orange HRM Demo Test Automation  
+**Epic**: HRM-41 🔐 Authentication & Authorization 

@@ -1,192 +1,122 @@
-import { Page, Locator, expect } from '@playwright/test';
+import { Page, Locator } from '@playwright/test';
 import { BasePage } from './BasePage';
 
-/**
- * Login Page class for Orange HRM authentication functionality
- * Covers all authentication test scenarios from Jira tasks
- */
 export class LoginPage extends BasePage {
-  // Page elements - using robust selectors
-  private readonly usernameField: Locator;
-  private readonly passwordField: Locator;
-  private readonly loginButton: Locator;
-  private readonly errorMessage: Locator;
-  private readonly forgotPasswordLink: Locator;
-  private readonly loginForm: Locator;
-  private readonly pageTitle: Locator;
+  // Page elements
+  readonly usernameInput: Locator;
+  readonly passwordInput: Locator;
+  readonly loginButton: Locator;
+  readonly errorMessage: Locator;
+  readonly loginContainer: Locator;
+  readonly forgotPasswordLink: Locator;
+  readonly pageTitle: Locator;
 
   constructor(page: Page) {
     super(page);
-    // Robust selectors that are less likely to break
-    this.usernameField = page.locator('[name="username"]');
-    this.passwordField = page.locator('[name="password"]');
+    
+    // Initialize locators
+    this.usernameInput = page.locator('[name="username"]');
+    this.passwordInput = page.locator('[name="password"]');
     this.loginButton = page.locator('[type="submit"]');
     this.errorMessage = page.locator('.oxd-alert-content-text');
+    this.loginContainer = page.locator('.oxd-sheet');
     this.forgotPasswordLink = page.locator('.orangehrm-login-forgot-header');
-    this.loginForm = page.locator('.oxd-form');
     this.pageTitle = page.locator('.oxd-text--h5');
   }
 
   /**
    * Navigate to login page
    */
-  async navigateToLogin(): Promise<void> {
-    await this.navigateTo('/');
+  async navigateToLogin() {
+    await this.goto('/web/index.php/auth/login');
     await this.waitForPageLoad();
-    await this.verifyElementVisible(this.loginForm);
   }
 
   /**
-   * Perform login with provided credentials
-   * @param username - Username
-   * @param password - Password
+   * Perform login with credentials
+   * @param username - Username to login with
+   * @param password - Password to login with
    */
-  async login(username: string, password: string): Promise<void> {
-    await this.safeFill(this.usernameField, username);
-    await this.safeFill(this.passwordField, password);
-    await this.safeClick(this.loginButton);
-  }
-
-  /**
-   * Enter username only
-   * @param username - Username to enter
-   */
-  async enterUsername(username: string): Promise<void> {
-    await this.safeFill(this.usernameField, username);
-  }
-
-  /**
-   * Enter password only
-   * @param password - Password to enter
-   */
-  async enterPassword(password: string): Promise<void> {
-    await this.safeFill(this.passwordField, password);
-  }
-
-  /**
-   * Click login button
-   */
-  async clickLogin(): Promise<void> {
-    await this.safeClick(this.loginButton);
-  }
-
-  /**
-   * Verify login form is displayed
-   */
-  async verifyLoginFormDisplayed(): Promise<void> {
-    await this.verifyElementVisible(this.loginForm);
-    await this.verifyElementVisible(this.usernameField);
-    await this.verifyElementVisible(this.passwordField);
-    await this.verifyElementVisible(this.loginButton);
-  }
-
-  /**
-   * Verify error message is displayed
-   * @param expectedMessage - Expected error message (optional)
-   */
-  async verifyErrorMessage(expectedMessage?: string): Promise<void> {
-    await this.verifyElementVisible(this.errorMessage);
-    if (expectedMessage) {
-      await this.verifyTextContent(this.errorMessage, expectedMessage);
+  async login(username: string, password: string) {
+    try {
+      await this.fillText(this.usernameInput, username);
+      await this.fillText(this.passwordInput, password);
+      await this.clickElement(this.loginButton);
+      
+      // Wait for navigation or error message
+      await this.page.waitForTimeout(2000);
+    } catch (error) {
+      console.error('Login failed:', error);
+      throw error;
     }
   }
 
   /**
-   * Verify password field is masked (type='password')
+   * Perform valid login with Admin credentials
    */
-  async verifyPasswordFieldMasked(): Promise<void> {
-    const inputType = await this.passwordField.getAttribute('type');
-    expect(inputType).toBe('password');
+  async loginAsAdmin() {
+    await this.login('Admin', 'admin123');
   }
 
   /**
-   * Verify password field security attributes
+   * Get error message text
    */
-  async verifyPasswordFieldSecurity(): Promise<void> {
-    // Check input type
-    await this.verifyPasswordFieldMasked();
-    
-    // Check autocomplete attribute
-    const autocomplete = await this.passwordField.getAttribute('autocomplete');
-    expect(autocomplete).toBe('current-password');
-    
-    // Verify password is visually masked
-    await this.passwordField.fill('testpassword');
-    const value = await this.passwordField.inputValue();
-    // The input value should still be the text, but it should be visually masked
-    expect(value).toBe('testpassword');
-    
-    // Check that the field appears masked in the DOM
-    const pseudoElementContent = await this.page.evaluate(() => {
-      const field = document.querySelector('[name="password"]') as HTMLInputElement;
-      return field ? window.getComputedStyle(field).getPropertyValue('-webkit-text-security') : null;
-    });
-    
-    // Verify field is not readable via inspect element easily
-    const isPasswordField = await this.passwordField.evaluate((el: HTMLInputElement) => {
-      return el.type === 'password';
-    });
-    expect(isPasswordField).toBe(true);
+  async getErrorMessage(): Promise<string> {
+    try {
+      await this.errorMessage.waitFor({ state: 'visible', timeout: 5000 });
+      return await this.getTextContent(this.errorMessage);
+    } catch {
+      return '';
+    }
   }
 
   /**
-   * Test SQL injection in login fields
-   * @param maliciousInput - SQL injection payload
+   * Check if error message is displayed
    */
-  async testSQLInjection(maliciousInput: string = "'; DROP TABLE users; --"): Promise<void> {
-    await this.enterUsername(maliciousInput);
-    await this.enterPassword(maliciousInput);
-    await this.clickLogin();
-    
-    // Should not crash the application or show SQL errors
-    // Should show normal login error
-    await this.verifyErrorMessage();
+  async isErrorMessageDisplayed(): Promise<boolean> {
+    return await this.isElementVisible(this.errorMessage);
   }
 
   /**
-   * Test XSS in login fields
-   * @param xssPayload - XSS payload
+   * Verify login page is loaded
    */
-  async testXSSInjection(xssPayload: string = '<script>alert("XSS")</script>'): Promise<void> {
-    await this.enterUsername(xssPayload);
-    await this.enterPassword(xssPayload);
-    await this.clickLogin();
-    
-    // Should not execute script or show XSS behavior
-    // Should show normal login error
-    await this.verifyErrorMessage();
+  async verifyLoginPageLoaded() {
+    await this.verifyElementVisible(this.loginContainer);
+    await this.verifyElementVisible(this.usernameInput);
+    await this.verifyElementVisible(this.passwordInput);
+    await this.verifyElementVisible(this.loginButton);
   }
 
   /**
-   * Clear all form fields
+   * Get username input placeholder
    */
-  async clearFields(): Promise<void> {
-    await this.usernameField.clear();
-    await this.passwordField.clear();
+  async getUsernamePlaceholder(): Promise<string> {
+    return await this.usernameInput.getAttribute('placeholder') || '';
   }
 
   /**
-   * Verify user remains on login page after failed attempt
+   * Get password input type attribute
    */
-  async verifyStillOnLoginPage(): Promise<void> {
-    await this.verifyElementVisible(this.loginForm);
-    const currentUrl = await this.getCurrentUrl();
-    expect(currentUrl).toContain('orangehrmlive.com');
-    expect(currentUrl).not.toContain('dashboard');
+  async getPasswordInputType(): Promise<string> {
+    return await this.passwordInput.getAttribute('type') || '';
   }
 
   /**
-   * Get username field placeholder text
+   * Verify password field is masked
    */
-  async getUsernamePlaceholder(): Promise<string | null> {
-    return await this.usernameField.getAttribute('placeholder');
+  async verifyPasswordFieldMasked() {
+    const inputType = await this.getPasswordInputType();
+    if (inputType !== 'password') {
+      throw new Error(`Expected password field type to be 'password', but got '${inputType}'`);
+    }
   }
 
   /**
-   * Get password field placeholder text
+   * Clear login form
    */
-  async getPasswordPlaceholder(): Promise<string | null> {
-    return await this.passwordField.getAttribute('placeholder');
+  async clearForm() {
+    await this.usernameInput.clear();
+    await this.passwordInput.clear();
   }
 
   /**
@@ -197,9 +127,13 @@ export class LoginPage extends BasePage {
   }
 
   /**
-   * Verify forgot password link functionality
+   * Get page title text
    */
-  async verifyForgotPasswordLink(): Promise<void> {
-    await this.verifyElementVisible(this.forgotPasswordLink);
+  async getPageTitleText(): Promise<string> {
+    try {
+      return await this.getTextContent(this.pageTitle);
+    } catch {
+      return '';
+    }
   }
 } 
