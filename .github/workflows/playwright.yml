@@ -1,52 +1,105 @@
-name: 🧪 Orange HRM Playwright Tests
+name: Orange HRM Authentication Tests
 
 on:
   push:
-    branches: [ main, feature/* ]
+    branches: [ main, feature/authentication-test-suite ]
   pull_request:
     branches: [ main ]
   schedule:
-    # Run tests daily at 2 AM UTC
-    - cron: '0 2 * * *'
+    - cron: '0 2 * * *'  # Daily at 2 AM UTC
 
 jobs:
   test:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     
+    strategy:
+      fail-fast: false
+      matrix:
+        # Following workspace rules: Chrome browser only
+        browser: [chrome]
+        
     steps:
-    - name: 📥 Checkout code
-      uses: actions/checkout@v4
-      
-    - name: 🔧 Setup Node.js
-      uses: actions/setup-node@v4
+    - uses: actions/checkout@v4
+    
+    - uses: actions/setup-node@v4
       with:
         node-version: '18'
         cache: 'npm'
         
-    - name: 📦 Install dependencies
+    - name: Install dependencies
       run: npm ci
       
-    - name: 🌐 Install Playwright browsers
-      run: npx playwright install chromium
+    - name: Install Playwright Browsers
+      run: npx playwright install chrome
       
-    - name: 🧪 Run Authentication Tests
-      run: npm run test:auth
-      
-    - name: 📊 Upload test results
+    - name: Run Playwright tests
+      run: npx playwright test --project=chrome
+      env:
+        CI: true
+        
+    - name: Upload test results
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: playwright-report
+        name: playwright-report-${{ matrix.browser }}
         path: |
-          playwright-report/
           test-results/
+          playwright-report/
         retention-days: 30
         
-    - name: 📈 Upload test report
+    - name: Upload screenshots
       uses: actions/upload-artifact@v4
-      if: always()
+      if: failure()
       with:
-        name: test-results
-        path: test-results/
-        retention-days: 7 
+        name: screenshots-${{ matrix.browser }}
+        path: test-results/screenshots/
+        retention-days: 30
+
+  # Comment test results on PR
+  comment-pr:
+    if: github.event_name == 'pull_request'
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Comment PR with test results
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+          
+          // Create a summary comment
+          const comment = `## 🧪 Authentication Test Results
+          
+          Tests have completed for commit ${{ github.sha }}.
+          
+          ### 📊 Test Coverage
+          - ✅ Valid Login Tests (HRM-35)
+          - ✅ Invalid Login Tests (HRM-36) 
+          - ✅ Password Masking Tests (HRM-37)
+          - ✅ Role-Based Access Tests (HRM-38)
+          - ✅ Logout Functionality Tests (HRM-39)
+          - ✅ Session Timeout Tests (HRM-40)
+          
+          ### 🔗 Related Epic
+          - **Epic**: HRM-34 Authentication & Authorization
+          - **Framework**: Playwright with Chrome
+          - **Test Environment**: Orange HRM Demo
+          
+          ### 📋 Artifacts
+          - Test reports and screenshots are available in the workflow artifacts
+          - Failed tests include detailed screenshots for debugging
+          
+          *Following automation rules: Chrome browser only, Page Object Model pattern*`;
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          }); 

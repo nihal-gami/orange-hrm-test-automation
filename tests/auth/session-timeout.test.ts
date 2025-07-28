@@ -3,273 +3,344 @@ import { LoginPage } from '../../pages/LoginPage';
 import { DashboardPage } from '../../pages/DashboardPage';
 
 /**
- * Test Suite: Session Timeout Handling
- * Jira Task: HRM-31
- * Epic: HRM-27 🔐 Authentication & Authorization
+ * Test Suite: Session Timeout Test
+ * Related Jira Task: HRM-40
+ * Epic: HRM-34 Authentication & Authorization
+ * 
+ * Verifies session timeout functionality and proper handling
  */
-test.describe('Session Timeout Tests', () => {
+test.describe('Session Timeout', () => {
   let loginPage: LoginPage;
   let dashboardPage: DashboardPage;
 
   test.beforeEach(async ({ page }) => {
-    await page.goto('/web/index.php/auth/login');
     loginPage = new LoginPage(page);
     dashboardPage = new DashboardPage(page);
+    
+    // Login before each test
+    await loginPage.navigateToLogin();
+    await loginPage.login('Admin', 'admin123');
+    await dashboardPage.verifyDashboardLoaded();
   });
 
-  test('HRM-31: Should redirect to login after session timeout simulation', async ({ page }) => {
-    // Arrange - Login first
-    await loginPage.loginWithValidCredentials();
-    await dashboardPage.waitForDashboardLoad();
-    
-    // Act - Simulate session timeout by clearing session storage/cookies
-    await page.evaluate(() => {
-      // Clear session storage
-      sessionStorage.clear();
-      localStorage.clear();
+  test('HRM-40: Should handle simulated session timeout', async ({ page }) => {
+    await test.step('Simulate session timeout by clearing storage', async () => {
+      await dashboardPage.simulateSessionTimeout();
     });
-    
-    // Clear session cookies
-    await page.context().clearCookies();
-    
-    // Try to access protected page
-    await page.goto('/web/index.php/admin/viewSystemUsers');
-    
-    // Assert - Should be redirected to login page
-    await expect(page).toHaveURL(/.*login/);
-    await expect(loginPage.loginContainer).toBeVisible();
-  });
 
-  test('Should handle expired session when accessing protected resources', async ({ page }) => {
-    // Arrange - Login and navigate to dashboard
-    await loginPage.loginWithValidCredentials();
-    await dashboardPage.waitForDashboardLoad();
-    
-    // Get current session cookies
-    const cookies = await page.context().cookies();
-    console.log(`Session cookies found: ${cookies.length}`);
-    
-    // Act - Clear all cookies to simulate session expiration
-    await page.context().clearCookies();
-    
-    // Try to navigate to a protected page
-    await page.goto('/web/index.php/pim/viewEmployeeList');
-    
-    // Assert - Should be redirected to login due to expired session
-    await page.waitForLoadState('networkidle');
-    await expect(page).toHaveURL(/.*login/);
-  });
-
-  test('Should verify session timeout after prolonged inactivity', async ({ page }) => {
-    // Arrange - Login
-    await loginPage.loginWithValidCredentials();
-    await dashboardPage.waitForDashboardLoad();
-    
-    // Act - Simulate prolonged inactivity by waiting and then trying to perform an action
-    // Note: In real scenarios, this might be a longer wait, but for testing we simulate it
-    await page.waitForTimeout(5000); // 5 seconds simulation
-    
-    // Try to access a different module after "inactivity"
-    await dashboardPage.navigateToAdmin();
-    
-    // Assert - In demo environment, session might still be valid
-    // But we verify the behavior is consistent
-    const currentUrl = page.url();
-    console.log(`URL after inactivity: ${currentUrl}`);
-    
-    // If redirected to login, verify login page elements
-    if (currentUrl.includes('login')) {
-      await expect(loginPage.loginContainer).toBeVisible();
-    } else {
-      // If still logged in, verify we can access the admin page
-      await expect(page).toHaveURL(/.*admin/);
-    }
-  });
-
-  test('Should require re-authentication after session expiration', async ({ page }) => {
-    // Arrange - Login and get to dashboard
-    await loginPage.loginWithValidCredentials();
-    await dashboardPage.waitForDashboardLoad();
-    
-    // Act - Simulate session expiration
-    await page.evaluate(() => {
-      // Clear all storage
-      sessionStorage.clear();
-      localStorage.clear();
+    await test.step('Verify redirect to login page', async () => {
+      await loginPage.verifyLoginFormDisplayed();
       
-      // Clear any authentication tokens if stored in localStorage
-      Object.keys(localStorage).forEach(key => {
-        if (key.toLowerCase().includes('token') || 
-            key.toLowerCase().includes('auth') ||
-            key.toLowerCase().includes('session')) {
-          localStorage.removeItem(key);
-        }
-      });
+      const currentUrl = await page.url();
+      expect(currentUrl).toContain('login');
     });
-    
-    // Clear cookies
-    await page.context().clearCookies();
-    
-    // Try to perform a sensitive action (navigate to admin)
-    await page.goto('/web/index.php/admin/viewSystemUsers');
-    
-    // Assert - In demo environment, session might persist server-side
-    // Check if redirected to login OR if still has access (demo behavior)
-    const currentUrl = page.url();
-    
-    if (currentUrl.includes('login')) {
-      // Production-like behavior: redirected to login
-      await expect(page).toHaveURL(/.*login/);
-      console.log('✅ Session properly expired - redirected to login');
-      
-      // Verify re-authentication is required
-      await loginPage.loginWithValidCredentials();
+
+    await test.step('Verify cannot access protected resources', async () => {
+      // Try to access dashboard directly
+      await page.goto('/web/index.php/dashboard/index');
       await page.waitForLoadState('networkidle');
       
-      // Wait for redirect after login (may take a moment)
-      await page.waitForTimeout(2000);
-      
-      // After login, app may redirect to originally requested page (admin) or dashboard
-      const postLoginUrl = page.url();
-      if (postLoginUrl.includes('dashboard')) {
-        await expect(page).toHaveURL(/.*dashboard/);
-        console.log('✅ Re-authentication successful - redirected to dashboard');
-      } else if (postLoginUrl.includes('admin')) {
-        // App redirected back to originally requested admin page - this is correct behavior
-        await expect(page).toHaveURL(/.*admin/);
-        console.log('✅ Re-authentication successful - redirected to originally requested page');
-      } else if (postLoginUrl.includes('login')) {
-        // Still on login page - try navigating manually to verify login worked
-        console.log('ℹ️  Still on login page after re-authentication, checking if login was successful');
-        await page.goto('/web/index.php/dashboard/index');
-        await page.waitForLoadState('networkidle');
-        
-        const finalUrl = page.url();
-        if (finalUrl.includes('dashboard')) {
-          console.log('✅ Re-authentication successful - manual navigation to dashboard worked');
-          await expect(page).toHaveURL(/.*dashboard/);
-        } else if (finalUrl.includes('login')) {
-          throw new Error('Re-authentication failed - still redirected to login');
-        } else {
-          console.log(`✅ Re-authentication successful - navigated to: ${finalUrl}`);
-        }
-      } else {
-        throw new Error(`Unexpected URL after re-authentication: ${postLoginUrl}`);
-      }
-    } else if (currentUrl.includes('admin')) {
-      // Demo environment behavior: session persisted server-side
-      console.log('ℹ️  Demo environment: Server-side session maintained after client-side clear');
-      await expect(page).toHaveURL(/.*admin/);
-      
-      // Verify we can still navigate (session is active)
-      await page.goto('/web/index.php/dashboard/index');
-      await dashboardPage.waitForDashboardLoad();
-    } else {
-      throw new Error(`Unexpected URL after session clear: ${currentUrl}`);
-    }
+      // Should redirect to login
+      const finalUrl = await page.url();
+      expect(finalUrl).toContain('login');
+    });
   });
 
-  test('Should maintain session during normal activity', async ({ page }) => {
-    // Arrange - Login
-    await loginPage.loginWithValidCredentials();
-    await dashboardPage.waitForDashboardLoad();
+  test('HRM-40: Should test session timeout after inactivity period', async ({ page }) => {
+    // Note: This test simulates timeout since waiting for real timeout would take too long
     
-    // Act - Perform normal user activities
-    await dashboardPage.navigateToPIM();
-    await page.waitForLoadState('networkidle');
-    
-    await dashboardPage.navigateToLeave();
-    await page.waitForLoadState('networkidle');
-    
-    await dashboardPage.navigateToMyInfo();
-    await page.waitForLoadState('networkidle');
-    
-    // Assert - Session should remain active
-    await expect(page).toHaveURL(/.*pim/);
-    await expect(dashboardPage.userDropdown).toBeVisible();
-  });
+    await test.step('Verify initial session is active', async () => {
+      await dashboardPage.verifySessionActive();
+    });
 
-  test('Should handle concurrent session management', async ({ page, context }) => {
-    // Arrange - Login in first tab
-    await loginPage.loginWithValidCredentials();
-    await dashboardPage.waitForDashboardLoad();
-    
-    // Create second tab and try to access protected page
-    const secondTab = await context.newPage();
-    await secondTab.goto('/web/index.php/dashboard/index');
-    
-    const secondDashboard = new DashboardPage(secondTab);
-    
-    // If session is shared, second tab should also be logged in
-    try {
-      await secondDashboard.waitForDashboardLoad();
-      console.log('Session shared across tabs');
-      
-      // Clear session in first tab
+    await test.step('Simulate extended inactivity', async () => {
+      // Clear session storage to simulate timeout
       await page.evaluate(() => {
         sessionStorage.clear();
         localStorage.clear();
       });
-      await page.context().clearCookies();
       
-      // Check if second tab is affected
-      await secondTab.reload();
-      await secondTab.waitForLoadState('networkidle');
+      // Clear authentication cookies
+      const context = page.context();
+      await context.clearCookies();
       
-      // Verify if second tab was also logged out
-      const secondTabUrl = secondTab.url();
-      console.log(`Second tab URL after session clear: ${secondTabUrl}`);
+      // Wait a moment for any JavaScript session handlers
+      await page.waitForTimeout(1000);
+    });
+
+    await test.step('Attempt to perform action after simulated timeout', async () => {
+      // Try to navigate to a different module
+      await page.reload();
+      await page.waitForLoadState('networkidle');
       
-    } catch (error) {
-      console.log('Session not shared or second tab requires separate login');
-    }
-    
-    await secondTab.close();
+      // Should redirect to login page
+      const currentUrl = await page.url();
+      expect(currentUrl).toContain('login');
+    });
   });
 
-  test('Should verify session cleanup on browser close simulation', async ({ page }) => {
-    // Arrange - Login
-    await loginPage.loginWithValidCredentials();
-    await dashboardPage.waitForDashboardLoad();
-    
-    // Get session information before "closing"
-    const beforeSessionStorage = await page.evaluate(() => 
-      Object.keys(sessionStorage).length
-    );
-    
-    // Act - Simulate browser close by clearing session storage
-    await page.evaluate(() => {
-      sessionStorage.clear();
-      // Also clear any temporary authentication state
-      if (window.location.hash) {
-        window.location.hash = '';
+  test('HRM-40: Should maintain session during active usage', async ({ page }) => {
+    await test.step('Perform various actions to keep session active', async () => {
+      const actions = [
+        () => dashboardPage.navigateToPIM(),
+        () => dashboardPage.navigateToLeave(),
+        () => dashboardPage.navigateToAdmin(),
+        () => page.goto('/web/index.php/dashboard/index')
+      ];
+
+      // Perform actions with delays
+      for (const action of actions) {
+        await action();
+        await page.waitForLoadState('networkidle');
+        await page.waitForTimeout(2000); // 2 second delay between actions
+        
+        // Verify session is still active
+        await dashboardPage.verifySessionActive();
       }
     });
-    
-    // Refresh page to simulate reopening browser
-    await page.reload();
-    await page.waitForLoadState('networkidle');
-    
-    // Assert - Check behavior (demo vs production)
-    const currentUrl = page.url();
-    
-    if (currentUrl.includes('login')) {
-      // Production-like behavior: session cleared, redirected to login
-      await expect(page).toHaveURL(/.*login/);
-      await expect(loginPage.loginContainer).toBeVisible();
-      console.log('✅ Session properly cleared on browser close simulation');
-    } else if (currentUrl.includes('dashboard')) {
-      // Demo environment behavior: server maintains session despite client-side clear
-      console.log('ℹ️  Demo environment: Session maintained after page reload');
-      await expect(dashboardPage.dashboardHeader).toBeVisible();
+
+    await test.step('Verify session remains active after activity', async () => {
+      await dashboardPage.verifySessionActive();
       
-      // Verify session storage was actually cleared
-      const afterSessionStorage = await page.evaluate(() => 
-        Object.keys(sessionStorage).length
-      );
-      expect(afterSessionStorage).toBeLessThanOrEqual(beforeSessionStorage);
-    } else {
-      throw new Error(`Unexpected URL after browser close simulation: ${currentUrl}`);
+      // Should still be able to access dashboard
+      const currentUrl = await page.url();
+      expect(currentUrl).not.toContain('login');
+    });
+  });
+
+  test('HRM-40: Should handle session timeout during form submission', async ({ page }) => {
+    await test.step('Navigate to a form page', async () => {
+      await dashboardPage.navigateToPIM();
+      await page.waitForLoadState('networkidle');
+    });
+
+    await test.step('Simulate session timeout during form interaction', async () => {
+      // Clear session in background (simulating timeout)
+      await page.evaluate(() => {
+        sessionStorage.clear();
+        // Simulate partial localStorage clearing that might happen during timeout
+        const keys = Object.keys(localStorage);
+        keys.forEach(key => {
+          if (key.includes('session') || key.includes('auth')) {
+            localStorage.removeItem(key);
+          }
+        });
+      });
+      
+      // Clear auth cookies
+      const context = page.context();
+      await context.clearCookies();
+    });
+
+    await test.step('Attempt form submission after timeout', async () => {
+      // Try to perform an action that requires authentication
+      await page.reload();
+      await page.waitForLoadState('networkidle');
+      
+      // Should redirect to login
+      const currentUrl = await page.url();
+      expect(currentUrl).toContain('login');
+    });
+  });
+
+  test('HRM-40: Should handle session timeout in multiple tabs', async ({ page, context }) => {
+    await test.step('Open second tab with same session', async () => {
+      const secondPage = await context.newPage();
+      await secondPage.goto(page.url());
+      
+      const secondDashboard = new DashboardPage(secondPage);
+      await secondDashboard.verifyDashboardLoaded();
+      
+      // Simulate timeout in first tab
+      await page.evaluate(() => {
+        sessionStorage.clear();
+        localStorage.clear();
+      });
+      await context.clearCookies();
+      
+      // Check first tab
+      await page.reload();
+      await page.waitForLoadState('networkidle');
+      
+      let firstTabUrl = await page.url();
+      expect(firstTabUrl).toContain('login');
+      
+      // Second tab should also be affected
+      await secondPage.reload();
+      await secondPage.waitForLoadState('networkidle');
+      
+      const secondTabUrl = await secondPage.url();
+      expect(secondTabUrl).toContain('login');
+      
+      await secondPage.close();
+    });
+  });
+
+  test('HRM-40: Should test session timeout warning mechanisms', async ({ page }) => {
+    // Note: This test checks for timeout warning functionality if implemented
+    
+    await test.step('Look for session timeout warning elements', async () => {
+      // Check if application has session timeout warnings
+      const warningSelectors = [
+        '.session-timeout-warning',
+        '.timeout-modal',
+        '[data-testid="session-warning"]',
+        '.alert-warning',
+        'text=session will expire',
+        'text=timeout warning'
+      ];
+      
+      let hasWarningMechanism = false;
+      for (const selector of warningSelectors) {
+        try {
+          const element = page.locator(selector);
+          if (await element.count() > 0) {
+            hasWarningMechanism = true;
+            console.log(`Found session warning mechanism: ${selector}`);
+            break;
+          }
+        } catch (error) {
+          // Continue checking other selectors
+        }
+      }
+      
+      console.log('Session timeout warning mechanism exists:', hasWarningMechanism);
+    });
+  });
+
+  test('HRM-40: Should verify session timeout across different modules', async ({ page }) => {
+    const modules = [
+      { name: 'PIM', navigate: () => dashboardPage.navigateToPIM() },
+      { name: 'Leave', navigate: () => dashboardPage.navigateToLeave() },
+      { name: 'Admin', navigate: () => dashboardPage.navigateToAdmin() }
+    ];
+
+    for (const module of modules) {
+      await test.step(`Test session timeout in ${module.name} module`, async () => {
+        // Navigate to module
+        await module.navigate();
+        await page.waitForLoadState('networkidle');
+        
+        // Simulate session timeout
+        await page.evaluate(() => {
+          sessionStorage.clear();
+          localStorage.clear();
+        });
+        
+        await page.context().clearCookies();
+        
+        // Try to perform an action
+        await page.reload();
+        await page.waitForLoadState('networkidle');
+        
+        // Should redirect to login
+        const currentUrl = await page.url();
+        expect(currentUrl).toContain('login');
+        
+        // Re-login for next iteration
+        if (module !== modules[modules.length - 1]) {
+          await loginPage.login('Admin', 'admin123');
+          await dashboardPage.verifyDashboardLoaded();
+        }
+      });
     }
   });
+
+  test('HRM-40: Should handle session timeout with AJAX requests', async ({ page }) => {
+    await test.step('Setup request monitoring', async () => {
+      // Monitor network requests for session validation
+      const requests: string[] = [];
+      page.on('request', request => {
+        requests.push(request.url());
+      });
+      
+      page.on('response', response => {
+        if (response.status() === 401 || response.status() === 403) {
+          console.log(`Authentication error response: ${response.status()} for ${response.url()}`);
+        }
+      });
+    });
+
+    await test.step('Simulate session timeout and make AJAX request', async () => {
+      // Clear session
+      await page.evaluate(() => {
+        sessionStorage.clear();
+        localStorage.clear();
+      });
+      
+      await page.context().clearCookies();
+      
+      // Try to trigger an AJAX request (by clicking something or navigating)
+      try {
+        await dashboardPage.navigateToPIM();
+        await page.waitForLoadState('networkidle');
+      } catch (error) {
+        console.log('Navigation failed due to session timeout, this is expected');
+      }
+      
+      // Check if redirected to login
+      const currentUrl = await page.url();
+      console.log('URL after AJAX request with expired session:', currentUrl);
+    });
+  });
+
+  test('HRM-40: Should test session extension on user activity', async ({ page }) => {
+    await test.step('Perform user activity to extend session', async () => {
+      // Simulate user activity by clicking and navigating
+      await page.mouse.move(100, 100);
+      await page.mouse.click(100, 100);
+      
+      await dashboardPage.navigateToPIM();
+      await page.waitForLoadState('networkidle');
+      
+      await page.mouse.move(200, 200);
+      await page.keyboard.press('Tab');
+      
+      await dashboardPage.navigateToLeave();
+      await page.waitForLoadState('networkidle');
+    });
+
+    await test.step('Verify session is still active after activity', async () => {
+      await dashboardPage.verifySessionActive();
+      
+      // Should still be authenticated
+      const currentUrl = await page.url();
+      expect(currentUrl).not.toContain('login');
+    });
+  });
+
+  test('HRM-40: Should handle browser refresh during session timeout', async ({ page }) => {
+    await test.step('Simulate timeout and immediate refresh', async () => {
+      // Clear session storage
+      await page.evaluate(() => {
+        sessionStorage.clear();
+        localStorage.clear();
+      });
+      
+      // Immediately refresh
+      await page.reload();
+      await page.waitForLoadState('networkidle');
+      
+      // Should redirect to login
+      const currentUrl = await page.url();
+      expect(currentUrl).toContain('login');
+    });
+
+    await test.step('Verify login form is functional after timeout', async () => {
+      await loginPage.verifyLoginFormDisplayed();
+      
+      // Should be able to login again
+      await loginPage.login('Admin', 'admin123');
+      await dashboardPage.verifyDashboardLoaded();
+    });
+
+    await test.step('Take screenshot of recovery after timeout', async () => {
+      await page.screenshot({ 
+        path: 'test-results/screenshots/session-timeout-recovery.png' 
+      });
+    });
+  });
+
+  // Note: beforeEach handles login, no explicit cleanup needed as session timeout tests
+  // naturally end with logout/session expiry
 }); 

@@ -1,11 +1,11 @@
 import { Page, Locator, expect } from '@playwright/test';
 
 /**
- * Base Page class containing common functionality for all page objects
- * Following Page Object Model (POM) pattern as per workspace rules
+ * Base Page class that contains common functionality for all pages
+ * Following Page Object Model (POM) pattern as per automation rules
  */
 export class BasePage {
-  readonly page: Page;
+  protected page: Page;
 
   constructor(page: Page) {
     this.page = page;
@@ -13,9 +13,9 @@ export class BasePage {
 
   /**
    * Navigate to a specific URL
-   * @param url - The URL to navigate to
+   * @param url - URL to navigate to
    */
-  async goto(url: string): Promise<void> {
+  async navigateTo(url: string): Promise<void> {
     await this.page.goto(url);
   }
 
@@ -27,7 +27,7 @@ export class BasePage {
   }
 
   /**
-   * Take a screenshot with a descriptive name
+   * Take screenshot for debugging
    * @param name - Screenshot name
    */
   async takeScreenshot(name: string): Promise<void> {
@@ -38,55 +38,72 @@ export class BasePage {
   }
 
   /**
-   * Get current page title
+   * Get page title
    */
-  async getTitle(): Promise<string> {
+  async getPageTitle(): Promise<string> {
     return await this.page.title();
   }
 
   /**
-   * Check if element is visible
-   * @param locator - Element locator
+   * Get current URL
    */
-  async isVisible(locator: Locator): Promise<boolean> {
-    return await locator.isVisible();
+  async getCurrentUrl(): Promise<string> {
+    return this.page.url();
   }
 
   /**
    * Wait for element to be visible
    * @param locator - Element locator
-   * @param timeout - Timeout in milliseconds
+   * @param timeout - Wait timeout (default: 30000ms)
    */
-  async waitForVisible(locator: Locator, timeout: number = 10000): Promise<void> {
+  async waitForElement(locator: Locator, timeout: number = 30000): Promise<void> {
     await locator.waitFor({ state: 'visible', timeout });
   }
 
   /**
-   * Click element with wait
+   * Safe click with wait
    * @param locator - Element locator
    */
-  async clickElement(locator: Locator): Promise<void> {
-    await locator.waitFor({ state: 'visible' });
+  async safeClick(locator: Locator): Promise<void> {
+    await this.waitForElement(locator);
     await locator.click();
   }
 
   /**
-   * Fill input field with text
-   * @param locator - Input field locator
-   * @param text - Text to fill
+   * Safe fill with wait
+   * @param locator - Element locator
+   * @param value - Value to fill
    */
-  async fillInput(locator: Locator, text: string): Promise<void> {
-    await locator.waitFor({ state: 'visible' });
+  async safeFill(locator: Locator, value: string): Promise<void> {
+    await this.waitForElement(locator);
     await locator.clear();
-    await locator.fill(text);
+    await locator.fill(value);
   }
 
   /**
-   * Get text content of element
+   * Verify element is visible
    * @param locator - Element locator
    */
-  async getText(locator: Locator): Promise<string> {
-    await locator.waitFor({ state: 'visible' });
-    return await locator.textContent() || '';
+  async verifyElementVisible(locator: Locator): Promise<void> {
+    await expect(locator).toBeVisible();
+  }
+
+  /**
+   * Verify text content
+   * @param locator - Element locator
+   * @param expectedText - Expected text
+   */
+  async verifyTextContent(locator: Locator, expectedText: string): Promise<void> {
+    await expect(locator).toContainText(expectedText);
+  }
+
+  /**
+   * Handle potential alerts/dialogs
+   */
+  async handleDialogs(): Promise<void> {
+    this.page.on('dialog', async dialog => {
+      console.log(`Dialog message: ${dialog.message()}`);
+      await dialog.accept();
+    });
   }
 } 

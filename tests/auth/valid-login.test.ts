@@ -4,62 +4,122 @@ import { DashboardPage } from '../../pages/DashboardPage';
 
 /**
  * Test Suite: Valid Login with Correct Credentials
- * Jira Task: HRM-28
- * Epic: HRM-27 🔐 Authentication & Authorization
+ * Related Jira Task: HRM-35
+ * Epic: HRM-34 Authentication & Authorization
  */
-test.describe('Valid Login Tests', () => {
+test.describe('Valid Login - Correct Credentials', () => {
+  let loginPage: LoginPage;
+  let dashboardPage: DashboardPage;
+
   test.beforeEach(async ({ page }) => {
-    // Navigate to Orange HRM login page before each test
-    await page.goto('/web/index.php/auth/login');
+    loginPage = new LoginPage(page);
+    dashboardPage = new DashboardPage(page);
+    
+    // Navigate to login page
+    await loginPage.navigateToLogin();
   });
 
-  test('HRM-28: Should successfully login with valid credentials', async ({ page }) => {
-    // Arrange
-    const loginPage = new LoginPage(page);
-    const dashboardPage = new DashboardPage(page);
+  test('HRM-35: Should successfully login with valid credentials', async ({ page }) => {
+    // Test Case: Valid login with Admin credentials
+    await test.step('Enter valid credentials', async () => {
+      await loginPage.login('Admin', 'admin123');
+    });
 
-    // Act
-    await loginPage.loginWithValidCredentials();
-    
-    // Assert
-    await dashboardPage.waitForDashboardLoad();
-    await expect(page).toHaveURL(/.*dashboard/);
-    await dashboardPage.verifyDashboardElements();
-    
-    // Verify dashboard title contains expected text
-    const dashboardTitle = await dashboardPage.getDashboardTitle();
-    expect(dashboardTitle).toContain('Dashboard');
-    
-    // Take screenshot for documentation
-    await dashboardPage.takeScreenshot('valid-login-success');
+    await test.step('Verify successful login and dashboard redirect', async () => {
+      // Wait for dashboard to load
+      await dashboardPage.verifyDashboardLoaded();
+      
+      // Verify URL redirection
+      const currentUrl = await dashboardPage.getCurrentUrl();
+      expect(currentUrl).toContain('dashboard');
+      
+      // Verify dashboard elements are visible
+      await dashboardPage.verifyDashboardTitle();
+      await dashboardPage.verifyMainMenuVisible();
+    });
+
+    await test.step('Verify user session is active', async () => {
+      await dashboardPage.verifySessionActive();
+    });
+
+    await test.step('Take screenshot for verification', async () => {
+      await page.screenshot({ 
+        path: 'test-results/screenshots/valid-login-success.png',
+        fullPage: true 
+      });
+    });
   });
 
-  test('Should verify login page elements are present', async ({ page }) => {
-    // Arrange
-    const loginPage = new LoginPage(page);
+  test('HRM-35: Should maintain session across page navigation', async ({ page }) => {
+    // Login first
+    await loginPage.login('Admin', 'admin123');
+    await dashboardPage.verifyDashboardLoaded();
 
-    // Act & Assert
-    await loginPage.verifyLoginPageElements();
-    
-    // Verify page title
-    const title = await loginPage.getTitle();
-    expect(title).toContain('OrangeHRM');
-    
-    // Verify login button text
-    const buttonText = await loginPage.getLoginButtonText();
-    expect(buttonText.toLowerCase()).toContain('login');
+    await test.step('Navigate to different modules and verify session persistence', async () => {
+      // Navigate to PIM
+      await dashboardPage.navigateToPIM();
+      await dashboardPage.verifySessionActive();
+      
+      // Navigate to Leave
+      await dashboardPage.navigateToLeave();
+      await dashboardPage.verifySessionActive();
+      
+      // Navigate back to Dashboard
+      await page.goto('/web/index.php/dashboard/index');
+      await dashboardPage.verifyDashboardLoaded();
+    });
   });
 
-  test('Should verify password field is properly masked', async ({ page }) => {
-    // Arrange
-    const loginPage = new LoginPage(page);
+  test('HRM-35: Should display correct user information after login', async ({ page }) => {
+    await loginPage.login('Admin', 'admin123');
+    await dashboardPage.verifyDashboardLoaded();
 
-    // Act & Assert
-    const isPasswordMasked = await loginPage.isPasswordFieldMasked();
-    expect(isPasswordMasked).toBe(true);
-    
-    // Verify password field type attribute
-    const passwordField = loginPage.passwordInput;
-    await expect(passwordField).toHaveAttribute('type', 'password');
+    await test.step('Verify Admin role access', async () => {
+      // Admin user should have access to Admin menu
+      await dashboardPage.verifyAdminMenuVisible();
+      
+      // Get user role
+      const userRole = await dashboardPage.getCurrentUserRole();
+      expect(userRole).toBe('Admin');
+    });
+
+    await test.step('Verify all menu items are accessible for Admin', async () => {
+      const visibleMenus = await dashboardPage.getVisibleMenuItems();
+      
+      // Admin should see all major modules
+      expect(visibleMenus).toContain('Admin');
+      expect(visibleMenus).toContain('PIM');
+      expect(visibleMenus).toContain('Leave');
+      expect(visibleMenus).toContain('Time');
+      expect(visibleMenus).toContain('Recruitment');
+      expect(visibleMenus).toContain('Performance');
+    });
+  });
+
+  test('HRM-35: Should handle slow network conditions gracefully', async ({ page, context }) => {
+    // Simulate slow network
+    await page.route('**/*', route => {
+      setTimeout(() => route.continue(), 1000); // 1 second delay
+    });
+
+    await test.step('Login with network delay', async () => {
+      await loginPage.login('Admin', 'admin123');
+      
+      // Should still succeed despite slow network
+      await dashboardPage.verifyDashboardLoaded();
+    });
+  });
+
+  test.afterEach(async ({ page }) => {
+    // Clean up: logout if logged in
+    try {
+      const currentUrl = await page.url();
+      if (currentUrl.includes('dashboard')) {
+        await dashboardPage.logout();
+        await loginPage.verifyLoginFormDisplayed();
+      }
+    } catch (error) {
+      console.log('Cleanup: User was not logged in or already logged out');
+    }
   });
 }); 

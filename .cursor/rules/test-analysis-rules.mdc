@@ -1,0 +1,14 @@
+---
+description: test analysis rules
+globs:
+alwaysApply: true
+
+
+TESTING ANALYSIS RULES:
+- Use simple text-based approaches for checking test results
+- Avoid HTML report viewers (playwright show-report) during development
+- Prefer --reporter=line or --reporter=json for clean output
+- If port conflicts occur (EADDRINUSE), switch to file-based analysis
+- Don't get stuck on fancy reporting - simple works better
+- Check for running processes before trying to start servers
+---

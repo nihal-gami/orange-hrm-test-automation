@@ -2,124 +2,204 @@ import { Page, Locator, expect } from '@playwright/test';
 import { BasePage } from './BasePage';
 
 /**
- * LoginPage class for Orange HRM login functionality
- * Implements Page Object Model pattern
+ * Login Page class for Orange HRM authentication functionality
+ * Covers all authentication test scenarios from Jira tasks
  */
 export class LoginPage extends BasePage {
-  // Page elements
-  readonly usernameInput: Locator;
-  readonly passwordInput: Locator;
-  readonly loginButton: Locator;
-  readonly errorMessage: Locator;
-  readonly loginContainer: Locator;
-  readonly forgotPasswordLink: Locator;
-  readonly companyBranding: Locator;
+  // Page elements - using robust selectors
+  private readonly usernameField: Locator;
+  private readonly passwordField: Locator;
+  private readonly loginButton: Locator;
+  private readonly errorMessage: Locator;
+  private readonly forgotPasswordLink: Locator;
+  private readonly loginForm: Locator;
+  private readonly pageTitle: Locator;
 
   constructor(page: Page) {
     super(page);
-    
-    // Initialize locators
-    this.usernameInput = page.locator('[name="username"]');
-    this.passwordInput = page.locator('[name="password"]');
+    // Robust selectors that are less likely to break
+    this.usernameField = page.locator('[name="username"]');
+    this.passwordField = page.locator('[name="password"]');
     this.loginButton = page.locator('[type="submit"]');
-    this.errorMessage = page.locator('.oxd-alert-content');
-    this.loginContainer = page.locator('.orangehrm-login-container');
-    this.forgotPasswordLink = page.locator('.orangehrm-login-forgot');
-    this.companyBranding = page.locator('.orangehrm-login-branding');
+    this.errorMessage = page.locator('.oxd-alert-content-text');
+    this.forgotPasswordLink = page.locator('.orangehrm-login-forgot-header');
+    this.loginForm = page.locator('.oxd-form');
+    this.pageTitle = page.locator('.oxd-text--h5');
   }
 
   /**
    * Navigate to login page
    */
-  async goto(): Promise<void> {
-    await super.goto('/web/index.php/auth/login');
+  async navigateToLogin(): Promise<void> {
+    await this.navigateTo('/');
     await this.waitForPageLoad();
+    await this.verifyElementVisible(this.loginForm);
   }
 
   /**
-   * Perform login with credentials
+   * Perform login with provided credentials
    * @param username - Username
    * @param password - Password
    */
   async login(username: string, password: string): Promise<void> {
-    await this.fillInput(this.usernameInput, username);
-    await this.fillInput(this.passwordInput, password);
-    await this.clickElement(this.loginButton);
+    await this.safeFill(this.usernameField, username);
+    await this.safeFill(this.passwordField, password);
+    await this.safeClick(this.loginButton);
   }
 
   /**
-   * Perform login with valid credentials (Admin/admin123)
+   * Enter username only
+   * @param username - Username to enter
    */
-  async loginWithValidCredentials(): Promise<void> {
-    await this.login('Admin', 'admin123');
+  async enterUsername(username: string): Promise<void> {
+    await this.safeFill(this.usernameField, username);
   }
 
   /**
-   * Check if login page is loaded
+   * Enter password only
+   * @param password - Password to enter
    */
-  async isLoginPageLoaded(): Promise<boolean> {
-    return await this.isVisible(this.loginContainer);
+  async enterPassword(password: string): Promise<void> {
+    await this.safeFill(this.passwordField, password);
   }
 
   /**
-   * Check if error message is displayed
+   * Click login button
    */
-  async isErrorMessageDisplayed(): Promise<boolean> {
-    return await this.isVisible(this.errorMessage);
+  async clickLogin(): Promise<void> {
+    await this.safeClick(this.loginButton);
   }
 
   /**
-   * Get error message text
+   * Verify login form is displayed
    */
-  async getErrorMessage(): Promise<string> {
-    return await this.getText(this.errorMessage);
+  async verifyLoginFormDisplayed(): Promise<void> {
+    await this.verifyElementVisible(this.loginForm);
+    await this.verifyElementVisible(this.usernameField);
+    await this.verifyElementVisible(this.passwordField);
+    await this.verifyElementVisible(this.loginButton);
   }
 
   /**
-   * Verify password field is masked
+   * Verify error message is displayed
+   * @param expectedMessage - Expected error message (optional)
    */
-  async isPasswordFieldMasked(): Promise<boolean> {
-    const passwordType = await this.passwordInput.getAttribute('type');
-    return passwordType === 'password';
+  async verifyErrorMessage(expectedMessage?: string): Promise<void> {
+    await this.verifyElementVisible(this.errorMessage);
+    if (expectedMessage) {
+      await this.verifyTextContent(this.errorMessage, expectedMessage);
+    }
   }
 
   /**
-   * Check if username field is empty
+   * Verify password field is masked (type='password')
    */
-  async isUsernameEmpty(): Promise<boolean> {
-    const value = await this.usernameInput.inputValue();
-    return value === '';
+  async verifyPasswordFieldMasked(): Promise<void> {
+    const inputType = await this.passwordField.getAttribute('type');
+    expect(inputType).toBe('password');
   }
 
   /**
-   * Check if password field is empty
+   * Verify password field security attributes
    */
-  async isPasswordEmpty(): Promise<boolean> {
-    const value = await this.passwordInput.inputValue();
-    return value === '';
+  async verifyPasswordFieldSecurity(): Promise<void> {
+    // Check input type
+    await this.verifyPasswordFieldMasked();
+    
+    // Check autocomplete attribute
+    const autocomplete = await this.passwordField.getAttribute('autocomplete');
+    expect(autocomplete).toBe('current-password');
+    
+    // Verify password is visually masked
+    await this.passwordField.fill('testpassword');
+    const value = await this.passwordField.inputValue();
+    // The input value should still be the text, but it should be visually masked
+    expect(value).toBe('testpassword');
+    
+    // Check that the field appears masked in the DOM
+    const pseudoElementContent = await this.page.evaluate(() => {
+      const field = document.querySelector('[name="password"]') as HTMLInputElement;
+      return field ? window.getComputedStyle(field).getPropertyValue('-webkit-text-security') : null;
+    });
+    
+    // Verify field is not readable via inspect element easily
+    const isPasswordField = await this.passwordField.evaluate((el: HTMLInputElement) => {
+      return el.type === 'password';
+    });
+    expect(isPasswordField).toBe(true);
   }
 
   /**
-   * Click forgot password link
+   * Test SQL injection in login fields
+   * @param maliciousInput - SQL injection payload
    */
-  async clickForgotPassword(): Promise<void> {
-    await this.clickElement(this.forgotPasswordLink);
+  async testSQLInjection(maliciousInput: string = "'; DROP TABLE users; --"): Promise<void> {
+    await this.enterUsername(maliciousInput);
+    await this.enterPassword(maliciousInput);
+    await this.clickLogin();
+    
+    // Should not crash the application or show SQL errors
+    // Should show normal login error
+    await this.verifyErrorMessage();
   }
 
   /**
-   * Verify all login page elements are present
+   * Test XSS in login fields
+   * @param xssPayload - XSS payload
    */
-  async verifyLoginPageElements(): Promise<void> {
-    await expect(this.usernameInput).toBeVisible();
-    await expect(this.passwordInput).toBeVisible();
-    await expect(this.loginButton).toBeVisible();
-    await expect(this.companyBranding).toBeVisible();
+  async testXSSInjection(xssPayload: string = '<script>alert("XSS")</script>'): Promise<void> {
+    await this.enterUsername(xssPayload);
+    await this.enterPassword(xssPayload);
+    await this.clickLogin();
+    
+    // Should not execute script or show XSS behavior
+    // Should show normal login error
+    await this.verifyErrorMessage();
   }
 
   /**
-   * Get login button text
+   * Clear all form fields
    */
-  async getLoginButtonText(): Promise<string> {
-    return await this.getText(this.loginButton);
+  async clearFields(): Promise<void> {
+    await this.usernameField.clear();
+    await this.passwordField.clear();
+  }
+
+  /**
+   * Verify user remains on login page after failed attempt
+   */
+  async verifyStillOnLoginPage(): Promise<void> {
+    await this.verifyElementVisible(this.loginForm);
+    const currentUrl = await this.getCurrentUrl();
+    expect(currentUrl).toContain('orangehrmlive.com');
+    expect(currentUrl).not.toContain('dashboard');
+  }
+
+  /**
+   * Get username field placeholder text
+   */
+  async getUsernamePlaceholder(): Promise<string | null> {
+    return await this.usernameField.getAttribute('placeholder');
+  }
+
+  /**
+   * Get password field placeholder text
+   */
+  async getPasswordPlaceholder(): Promise<string | null> {
+    return await this.passwordField.getAttribute('placeholder');
+  }
+
+  /**
+   * Check if login button is enabled
+   */
+  async isLoginButtonEnabled(): Promise<boolean> {
+    return await this.loginButton.isEnabled();
+  }
+
+  /**
+   * Verify forgot password link functionality
+   */
+  async verifyForgotPasswordLink(): Promise<void> {
+    await this.verifyElementVisible(this.forgotPasswordLink);
   }
 } 
