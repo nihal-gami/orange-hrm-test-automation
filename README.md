@@ -1,3 +1,4 @@
+
 # Orange HRM Automation Suite
 
 [![Playwright Tests](https://github.com/nihal-gami/orange-hrm-automation-suite/actions/workflows/playwright.yml/badge.svg)](https://github.com/nihal-gami/orange-hrm-automation-suite/actions/workflows/playwright.yml)
@@ -233,4 +234,4 @@ For questions or issues:
 ---
 
 **Last Updated**: January 2025  
-**Maintainer**: Test Automation Team 
+**Maintainer**: Test Automation Team
