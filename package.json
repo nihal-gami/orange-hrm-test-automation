@@ -1,5 +1,5 @@
 {
-  "name": "orange-hrm-automation-suite",
+  "name": "orange-hrm-automation",
   "version": "1.0.0",
   "description": "Automated test suite for Orange HRM Demo application using Playwright",
   "main": "index.js",
