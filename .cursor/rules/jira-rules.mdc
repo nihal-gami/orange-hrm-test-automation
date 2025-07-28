@@ -1,0 +1,18 @@
+---
+description: Jira project management rules for Orange HRM Automation Project
+globs:
+  - "*"
+alwaysApply: true
+---
+# Jira Project Management Rules
+
+- Use semantic project keys: `AUTH`, `OHR`, `TEST`, `AUTO`.
+- Never use methodology names like `SCRUM`, `AGILE` as project keys.
+- Create new projects with proper keys instead of using generic ones.
+- Epic names should clearly describe the functional area (e.g., "Authentication Epic").
+- Task names should be specific and actionable (e.g., "Implement Login Validation").
+- Use consistent naming patterns within the same project.
+- Avoid generic numbering without context.
+- Examples:
+  - ✅ Good: `AUTH-1: Authentication Epic`, `OHR-2: Login Validation`
+  - ❌ Bad: `SCRUM-6: Authentication Epic`, `SCRUM-7: Login Test`

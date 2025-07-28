@@ -1,0 +1,26 @@
+---
+description: Test automation rules for Orange HRM Automation Project, restricted to single browser
+globs:
+  - "*"
+alwaysApply: true
+---
+# 🧪 Test Automation Rules
+
+## 🔧 Framework & Structure
+- Follow the **Page Object Model (POM)** pattern to improve code readability and maintainability.
+- Use **data-driven testing** by sourcing test data from centralized files (e.g., `.json`, `.csv`).
+
+## ⚙️ Test Design & Resilience
+- Implement **robust error handling** using `try-catch` blocks and **dynamic waits** (e.g., Playwright’s `waitForSelector`, `expect` assertions with timeouts).
+- Avoid hardcoded waits like `sleep`; prefer built-in wait mechanisms for stability.
+
+## 🔐 Security Awareness
+- Include tests that validate basic **security vulnerabilities**, such as:
+  - **SQL Injection**
+  - **Cross-Site Scripting (XSS)**
+- Validate form inputs and use test cases that simulate user manipulation attempts.
+
+## 🌐 Browser Consistency
+- All automation tests must be executed in a **single browser: Chrome**.
+- **Do not implement cross-browser testing** unless explicitly approved by the team or required by the Jira ticket.
+
