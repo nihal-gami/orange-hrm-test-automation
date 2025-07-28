@@ -295,8 +295,4 @@ MIT License - See LICENSE file for details
 
 **Last Updated**: January 2025  
 **Maintainer**: Test Automation Team  
-**Version**: 1.0.0 
-=======
-# orange-hrm-automation
-🔐 Automated test suite for Orange HRM Demo - Authentication &amp; Authorization testing with Playwright and TypeScript. Epic: HRM-47
->>>>>>> 32ca1a05a1b4815c2b853ab670ebcecb4164db2b
+**Version**: 1.0.0
