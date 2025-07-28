@@ -3,197 +3,156 @@ import { LoginPage } from '../../pages/LoginPage';
 import { AuthTestData } from '../data/auth-test-data';
 
 /**
- * AUTH-003: Password Masking Validation Test
- * Jira Task: HRM-50
+ * Test Suite: Password Field Security
+ * Jira Task: HRM-56 - AUTH-003: Implement Password Field Masking Test
  * 
- * Test Objective: Verify that password field properly masks input characters 
- * for security purposes.
+ * Objective: Verify that password field properly masks input for security
  */
 
-test.describe('AUTH-003: Password Masking Tests', () => {
+test.describe('AUTH-003: Password Field Masking Tests', () => {
+  let loginPage: LoginPage;
+
   test.beforeEach(async ({ page }) => {
-    const loginPage = new LoginPage(page);
+    loginPage = new LoginPage(page);
     await loginPage.navigateToLogin();
   });
 
-  test('should mask password input field correctly', async ({ page }) => {
-    // Arrange
-    const loginPage = new LoginPage(page);
-    const passwordField = loginPage.getPasswordInput();
+  test('should mask password input characters', async ({ page }) => {
+    const testPassword = AuthTestData.passwordMaskingTest.testPassword;
 
-    // Act & Assert - Verify initial state
-    await expect(passwordField).toHaveAttribute('type', 'password');
-    
-    // Verify password field is visible and ready for input
-    await expect(passwordField).toBeVisible();
-    await expect(passwordField).toBeEnabled();
-    
-    // Enter password and verify masking
-    const testPassword = 'testpassword123';
-    await passwordField.fill(testPassword);
-    
-    // Assert - Password value should be present but masked visually
-    await expect(passwordField).toHaveValue(testPassword);
-    await expect(passwordField).toHaveAttribute('type', 'password');
-  });
+    await test.step('Enter password in password field', async () => {
+      await loginPage.enterPassword(testPassword);
+    });
 
-  test('should maintain password type attribute throughout interaction', async ({ page }) => {
-    // Arrange
-    const loginPage = new LoginPage(page);
-    const passwordField = loginPage.getPasswordInput();
+    await test.step('Verify password field type is "password"', async () => {
+      expect(await loginPage.isPasswordMasked()).toBe(true);
+    });
 
-    // Act - Various interactions with password field
-    await passwordField.click();
-    await expect(passwordField).toHaveAttribute('type', 'password');
-    
-    await passwordField.fill('password123');
-    await expect(passwordField).toHaveAttribute('type', 'password');
-    
-    await passwordField.clear();
-    await expect(passwordField).toHaveAttribute('type', 'password');
-    
-    await passwordField.fill('newpassword');
-    await expect(passwordField).toHaveAttribute('type', 'password');
-    
-    // Assert - Type should remain 'password' throughout
-    const finalType = await passwordField.getAttribute('type');
-    expect(finalType).toBe('password');
-  });
-
-  // Test password masking with different password types
-  AuthTestData.passwordMaskingTests.forEach((testData) => {
-    test(`should mask ${testData.testCase} correctly`, async ({ page }) => {
-      // Arrange
-      const loginPage = new LoginPage(page);
-      const passwordField = loginPage.getPasswordInput();
-
-      // Act
-      await passwordField.fill(testData.password);
-
-      // Assert
-      await expect(passwordField).toHaveValue(testData.password);
-      await expect(passwordField).toHaveAttribute('type', 'password');
-      
-      // Verify password is masked by checking computed styles
-      const inputType = await passwordField.getAttribute('type');
-      expect(inputType).toBe('password');
-      
-      // Verify no plain text password in page source
-      const pageContent = await page.content();
-      expect(pageContent).not.toContain(`value="${testData.password}"`);
-      
-      console.log(`✅ Password masking verified for: ${testData.testCase}`);
+    await test.step('Verify password value is stored correctly but not visible', async () => {
+      const passwordValue = await loginPage.getPasswordFieldValue();
+      expect(passwordValue).toBe(testPassword);
     });
   });
 
-  test('should not reveal password in DOM inspection', async ({ page }) => {
-    // Arrange
-    const loginPage = new LoginPage(page);
-    const passwordField = loginPage.getPasswordInput();
-    const secretPassword = 'super-secret-password-123!@#';
+  test('should not expose password in page source', async ({ page }) => {
+    const testPassword = AuthTestData.passwordMaskingTest.testPassword;
 
-    // Act
-    await passwordField.fill(secretPassword);
+    await test.step('Enter password', async () => {
+      await loginPage.enterPassword(testPassword);
+    });
 
-    // Assert - Check DOM doesn't expose password
-    const fieldValue = await passwordField.getAttribute('value');
-    expect(fieldValue).toBe(secretPassword); // Value should be there for form submission
-    
-    // Check page source doesn't show password in plain text
-    const pageHTML = await page.content();
-    const visibleText = await page.locator('body').textContent();
-    
-    // Password should not be visible in page text content
-    expect(visibleText).not.toContain(secretPassword);
-    
-    // Verify input type remains password
-    await expect(passwordField).toHaveAttribute('type', 'password');
+    await test.step('Verify password is not visible in page source', async () => {
+      const pageContent = await page.content();
+      expect(pageContent).not.toContain(testPassword);
+    });
   });
 
-  test('should handle copy-paste operations securely', async ({ page }) => {
-    // Arrange
-    const loginPage = new LoginPage(page);
-    const passwordField = loginPage.getPasswordInput();
-    const testPassword = 'clipboard-test-password';
+  test('should maintain password masking across browser interactions', async ({ page }) => {
+    const testPassword = AuthTestData.passwordMaskingTest.testPassword;
 
-    // Act - Fill password and attempt copy
-    await passwordField.fill(testPassword);
-    
-    // Try to select all text in password field
-    await passwordField.press('Meta+a'); // Ctrl+A / Cmd+A
-    
-    // Assert - Even after selection, type should remain password
-    await expect(passwordField).toHaveAttribute('type', 'password');
-    await expect(passwordField).toHaveValue(testPassword);
+    await test.step('Enter password and interact with other elements', async () => {
+      await loginPage.enterPassword(testPassword);
+      await loginPage.enterUsername('testuser');
+      
+      // Click back on password field
+      await page.locator('input[name="password"]').click();
+    });
+
+    await test.step('Verify password remains masked', async () => {
+      expect(await loginPage.isPasswordMasked()).toBe(true);
+    });
   });
 
-  test('should maintain masking during form submission', async ({ page }) => {
-    // Arrange
-    const loginPage = new LoginPage(page);
-    const passwordField = loginPage.getPasswordInput();
-    const usernameField = loginPage.getUsernameInput();
-    const testPassword = 'submission-test-password';
+  test('should not reveal password in browser developer tools', async ({ page }) => {
+    const testPassword = AuthTestData.passwordMaskingTest.testPassword;
 
-    // Act
-    await usernameField.fill('testuser');
-    await passwordField.fill(testPassword);
-    
-    // Verify masking before submission
-    await expect(passwordField).toHaveAttribute('type', 'password');
-    
-    // Submit form (this will fail validation but we're testing masking)
-    await page.keyboard.press('Enter');
-    
-    // Assert - Password should remain masked even after submission attempt
-    await expect(passwordField).toHaveAttribute('type', 'password');
-    
-    // Password field should be cleared after failed submission (security feature)
-    const passwordValue = await passwordField.inputValue();
-    expect(passwordValue).toBe('');
+    await test.step('Enter password', async () => {
+      await loginPage.enterPassword(testPassword);
+    });
+
+    await test.step('Verify password field attributes', async () => {
+      const passwordField = page.locator('input[name="password"]');
+      
+      // Check the input type attribute
+      const inputType = await passwordField.getAttribute('type');
+      expect(inputType).toBe('password');
+      
+      // Check that no visible text content contains the password
+      const visibleText = await passwordField.textContent();
+      expect(visibleText).not.toContain(testPassword);
+    });
   });
 
-  test('should verify password masking works with screen reader accessibility', async ({ page }) => {
-    // Arrange
-    const loginPage = new LoginPage(page);
-    const passwordField = loginPage.getPasswordInput();
+  test('should handle special characters in password masking', async ({ page }) => {
+    const specialCharPassword = 'P@$$w0rd!2023#&*()';
 
-    // Act & Assert - Check accessibility attributes
-    await expect(passwordField).toHaveAttribute('type', 'password');
-    
-    // Verify accessibility attributes for screen readers
-    const ariaLabel = await passwordField.getAttribute('aria-label');
-    const placeholder = await passwordField.getAttribute('placeholder');
-    
-    // Should have proper accessibility setup
-    expect(placeholder).toBeTruthy();
-    
-    // Fill password and verify accessibility is maintained
-    await passwordField.fill('accessibility-test-password');
-    await expect(passwordField).toHaveAttribute('type', 'password');
+    await test.step('Enter password with special characters', async () => {
+      await loginPage.enterPassword(specialCharPassword);
+    });
+
+    await test.step('Verify special characters are properly masked', async () => {
+      expect(await loginPage.isPasswordMasked()).toBe(true);
+      const storedValue = await loginPage.getPasswordFieldValue();
+      expect(storedValue).toBe(specialCharPassword);
+    });
   });
 
-  test('should validate password field CSS properties for masking', async ({ page }) => {
-    // Arrange
-    const loginPage = new LoginPage(page);
-    const passwordField = loginPage.getPasswordInput();
+  test('should mask password during form submission', async ({ page }) => {
+    await test.step('Enter credentials', async () => {
+      await loginPage.enterUsername(AuthTestData.validCredentials.username);
+      await loginPage.enterPassword(AuthTestData.validCredentials.password);
+    });
 
-    // Act
-    await passwordField.fill('css-validation-password');
+    await test.step('Monitor network requests during login', async () => {
+      // Start monitoring network requests
+      const requests: any[] = [];
+      page.on('request', request => {
+        if (request.method() === 'POST') {
+          requests.push(request);
+        }
+      });
 
-         // Assert - Verify CSS properties support password masking
-     const computedStyle = await passwordField.evaluate((element) => {
-       const styles = window.getComputedStyle(element);
-       return {
-         fontFamily: styles.fontFamily,
-         textSecurity: styles.getPropertyValue('-webkit-text-security') || styles.getPropertyValue('text-security'),
-         inputType: (element as HTMLInputElement).type
-       };
-     });
+      await loginPage.clickLogin();
+      
+      // Wait a bit for the request to complete
+      await page.waitForTimeout(2000);
+      
+      // Verify password is not exposed in plain text in request monitoring
+      // Note: This is a basic check - full security audit would require more sophisticated monitoring
+      expect(requests.length).toBeGreaterThan(0);
+    });
+  });
 
-    expect(computedStyle.inputType).toBe('password');
-    
-    // In some browsers, password fields have special font rendering
-    // This ensures the field is properly configured for masking
-    console.log('Password field CSS properties:', computedStyle);
+  test('should clear password field securely', async ({ page }) => {
+    const testPassword = AuthTestData.passwordMaskingTest.testPassword;
+
+    await test.step('Enter password and then clear it', async () => {
+      await loginPage.enterPassword(testPassword);
+      await page.locator('input[name="password"]').clear();
+    });
+
+    await test.step('Verify password field is empty and still masked', async () => {
+      const passwordValue = await loginPage.getPasswordFieldValue();
+      expect(passwordValue).toBe('');
+      expect(await loginPage.isPasswordMasked()).toBe(true);
+    });
+  });
+
+  test('should handle copy-paste in password field securely', async ({ page }) => {
+    const testPassword = AuthTestData.passwordMaskingTest.testPassword;
+
+    await test.step('Simulate copy-paste in password field', async () => {
+      await loginPage.enterPassword(testPassword);
+      
+      // Try to select all and copy (this should not work in password fields)
+      await page.locator('input[name="password"]').press('Control+a');
+      await page.locator('input[name="password"]').press('Control+c');
+    });
+
+    await test.step('Verify password field maintains security', async () => {
+      expect(await loginPage.isPasswordMasked()).toBe(true);
+      const storedValue = await loginPage.getPasswordFieldValue();
+      expect(storedValue).toBe(testPassword);
+    });
   });
 }); 

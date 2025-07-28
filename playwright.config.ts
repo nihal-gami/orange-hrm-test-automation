@@ -1,61 +1,40 @@
 import { defineConfig, devices } from '@playwright/test';
+import * as dotenv from 'dotenv';
 
-/**
- * @see https://playwright.dev/docs/test-configuration
- */
+// Load environment variables
+dotenv.config();
+
 export default defineConfig({
   testDir: './tests',
-  /* Run tests in files in parallel */
+  timeout: 30000,
+  expect: {
+    timeout: 5000,
+  },
   fullyParallel: true,
-  /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
-  /* Retry on CI only */
   retries: process.env.CI ? 2 : 0,
-  /* Opt out of parallel tests on CI. */
   workers: process.env.CI ? 1 : undefined,
-  /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [
     ['html'],
-    ['json', { outputFile: 'test-results/results.json' }],
-    ['junit', { outputFile: 'test-results/results.xml' }],
-    ['list']
+    ['junit', { outputFile: 'test-results/junit-results.xml' }],
+    ['json', { outputFile: 'test-results/test-results.json' }]
   ],
-  /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
-    /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: 'https://opensource-demo.orangehrmlive.com/',
-    
-    /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
+    baseURL: 'https://opensource-demo.orangehrmlive.com',
     trace: 'on-first-retry',
-    
-    /* Take screenshot on failure */
     screenshot: 'only-on-failure',
-    
-    /* Record video on failure */
     video: 'retain-on-failure',
-    
-    /* Global timeout for actions */
-    actionTimeout: 10000,
-    
-    /* Global timeout for navigation */
-    navigationTimeout: 15000,
+    headless: process.env.CI ? true : false,
   },
 
-  /* Configure projects for major browsers */
   projects: [
     {
       name: 'chromium',
       use: { 
         ...devices['Desktop Chrome'],
-        // Chrome-specific settings as per testing standards
-        viewport: { width: 1920, height: 1080 },
-        launchOptions: {
-          args: ['--disable-dev-shm-usage', '--no-sandbox']
-        }
       },
     },
-    
-    // Commented out as per single browser testing standards
+    // Uncomment for cross-browser testing when needed
     // {
     //   name: 'firefox',
     //   use: { ...devices['Desktop Firefox'] },
@@ -66,17 +45,10 @@ export default defineConfig({
     // },
   ],
 
-  /* Global setup and teardown */
-  globalSetup: './tests/setup/global-setup.ts',
-  
-  /* Test timeout */
-  timeout: 30000,
-  
-  /* Expect timeout */
-  expect: {
-    timeout: 5000
-  },
-  
-  /* Output directory for test results */
-  outputDir: 'test-results/',
+  /* Run local dev server before starting tests */
+  // webServer: {
+  //   command: 'npm start',
+  //   url: 'http://127.0.0.1:3000',
+  //   reuseExistingServer: !process.env.CI,
+  // },
 }); 

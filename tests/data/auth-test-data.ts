@@ -1,143 +1,86 @@
-/**
- * Authentication Test Data
- * Centralized test data for Orange HRM authentication scenarios
- */
-
 export const AuthTestData = {
-  // Valid credentials
   validCredentials: {
     username: 'Admin',
     password: 'admin123'
   },
-
-  // Invalid credential combinations for negative testing
+  
   invalidCredentials: [
     {
-      testCase: 'Invalid Username + Valid Password',
+      scenario: 'Invalid username with valid password',
       username: 'InvalidUser',
       password: 'admin123',
       expectedError: 'Invalid credentials'
     },
     {
-      testCase: 'Valid Username + Invalid Password',
+      scenario: 'Valid username with invalid password',
       username: 'Admin',
       password: 'wrongpassword',
       expectedError: 'Invalid credentials'
     },
     {
-      testCase: 'Invalid Username + Invalid Password',
-      username: 'WrongUser',
+      scenario: 'Both username and password invalid',
+      username: 'InvalidUser',
       password: 'wrongpassword',
       expectedError: 'Invalid credentials'
     },
     {
-      testCase: 'Empty Username + Valid Password',
+      scenario: 'Empty username and password',
+      username: '',
+      password: '',
+      expectedError: 'Required'
+    },
+    {
+      scenario: 'Empty username with valid password',
       username: '',
       password: 'admin123',
       expectedError: 'Required'
     },
     {
-      testCase: 'Valid Username + Empty Password',
+      scenario: 'Valid username with empty password',
       username: 'Admin',
-      password: '',
-      expectedError: 'Required'
-    },
-    {
-      testCase: 'Both Fields Empty',
-      username: '',
       password: '',
       expectedError: 'Required'
     }
   ],
 
-  // Security test data for validation
-  securityTestData: [
+  securityTestInputs: [
     {
-      testCase: 'SQL Injection in Username',
+      scenario: 'SQL injection in username',
       username: "admin' OR '1'='1",
       password: 'admin123',
       expectedError: 'Invalid credentials'
     },
     {
-      testCase: 'SQL Injection in Password',
+      scenario: 'SQL injection in password',
       username: 'Admin',
-      password: "' OR '1'='1",
+      password: "password' OR '1'='1",
       expectedError: 'Invalid credentials'
     },
     {
-      testCase: 'XSS Script in Username',
+      scenario: 'XSS attempt in username',
       username: '<script>alert("xss")</script>',
       password: 'admin123',
       expectedError: 'Invalid credentials'
     },
     {
-      testCase: 'XSS Script in Password',
+      scenario: 'Script injection in password',
       username: 'Admin',
       password: '<script>alert("xss")</script>',
       expectedError: 'Invalid credentials'
     }
   ],
 
-  // User roles for access control testing
-  userRoles: {
-    admin: {
-      username: 'Admin',
-      password: 'admin123',
-      role: 'Admin',
-      expectedMenus: ['Admin', 'PIM', 'Leave', 'Time', 'Recruitment', 'My Info', 'Performance', 'Dashboard', 'Directory', 'Maintenance', 'Buzz'],
-      restrictedMenus: []
-    },
-    // Note: In demo environment, we primarily have Admin access
-    // In real scenarios, you would have additional roles like:
-    employee: {
-      username: 'Employee', // Placeholder - not available in demo
-      password: 'employee123',
-      role: 'ESS',
-      expectedMenus: ['My Info', 'Leave', 'Time'],
-      restrictedMenus: ['Admin', 'PIM', 'Recruitment']
-    }
+  passwordMaskingTest: {
+    testPassword: 'TestPassword123!',
+    expectedMaskedDisplay: '••••••••••••••••'
   },
 
-  // Password masking test data
-  passwordMaskingTests: [
-    {
-      testCase: 'Simple Password',
-      password: 'testpass123',
-      shouldBeMasked: true
-    },
-    {
-      testCase: 'Special Characters Password',
-      password: 'test@#$%^&*()',
-      shouldBeMasked: true
-    },
-    {
-      testCase: 'Long Password',
-      password: 'thisisaverylongpasswordfortesting12345',
-      shouldBeMasked: true
-    }
-  ],
-
-  // Application URLs
-  urls: {
-    loginPage: 'https://opensource-demo.orangehrmlive.com/web/index.php/auth/login',
-    dashboardPage: 'https://opensource-demo.orangehrmlive.com/web/index.php/dashboard/index',
-    baseUrl: 'https://opensource-demo.orangehrmlive.com/'
-  },
-
-  // Expected error messages
-  errorMessages: {
-    invalidCredentials: 'Invalid credentials',
-    requiredField: 'Required',
-    sessionExpired: 'Session has expired',
-    accessDenied: 'Access Denied'
-  },
-
-  // Timeouts and waits
-  timeouts: {
-    loginTimeout: 10000,
-    pageLoadTimeout: 15000,
-    elementWaitTimeout: 5000
+  sessionTestData: {
+    protectedUrls: [
+      '/web/index.php/dashboard/index',
+      '/web/index.php/admin/viewSystemUsers',
+      '/web/index.php/pim/viewEmployeeList',
+      '/web/index.php/leave/viewLeaveList'
+    ]
   }
-};
-
-export default AuthTestData; 
+}; 

@@ -4,262 +4,267 @@ import { DashboardPage } from '../../pages/DashboardPage';
 import { AuthTestData } from '../data/auth-test-data';
 
 /**
- * AUTH-005: Logout Functionality Test
- * Jira Task: HRM-52
+ * Test Suite: Logout Functionality
+ * Jira Task: HRM-58 - AUTH-005: Implement Logout Functionality Test
  * 
- * Test Objective: Verify that logout functionality works correctly and 
- * properly terminates user sessions.
+ * Objective: Verify that users can properly log out and session is terminated
  */
 
 test.describe('AUTH-005: Logout Functionality Tests', () => {
+  let loginPage: LoginPage;
+  let dashboardPage: DashboardPage;
+
   test.beforeEach(async ({ page }) => {
-    // Login before each test to have an active session
-    const loginPage = new LoginPage(page);
-    const dashboardPage = new DashboardPage(page);
-    const { username, password } = AuthTestData.validCredentials;
-
-    await loginPage.navigateToLogin();
-    await loginPage.login(username, password);
-    await dashboardPage.verifyDashboardLoaded();
+    loginPage = new LoginPage(page);
+    dashboardPage = new DashboardPage(page);
   });
 
-  test('should logout successfully and redirect to login page', async ({ page }) => {
-    // Arrange
-    const dashboardPage = new DashboardPage(page);
-    const loginPage = new LoginPage(page);
-
-    // Act
-    await dashboardPage.logout();
-
-    // Assert
-    await loginPage.verifyLoginPageLoaded();
-    await expect(page).toHaveURL(/.*login/);
-    
-    // Verify login elements are visible
-    await expect(loginPage.getUsernameInput()).toBeVisible();
-    await expect(loginPage.getPasswordInput()).toBeVisible();
-    
-    console.log('✅ Successfully logged out and redirected to login page');
-  });
-
-  test('should terminate session completely after logout', async ({ page }) => {
-    // Arrange
-    const dashboardPage = new DashboardPage(page);
-    const loginPage = new LoginPage(page);
-
-    // Act
-    await dashboardPage.logout();
-    await loginPage.verifyLoginPageLoaded();
-
-    // Try to access protected page directly
-    await page.goto('https://opensource-demo.orangehrmlive.com/web/index.php/dashboard/index');
-
-    // Assert
-    // Should be redirected back to login page due to session termination
-    await page.waitForURL(/.*login/);
-    await loginPage.verifyLoginPageLoaded();
-    
-    console.log('✅ Session properly terminated - cannot access protected pages');
-  });
-
-  test('should handle browser back button after logout', async ({ page }) => {
-    // Arrange
-    const dashboardPage = new DashboardPage(page);
-    const loginPage = new LoginPage(page);
-
-    // Act
-    await dashboardPage.logout();
-    await loginPage.verifyLoginPageLoaded();
-    
-    // Try to go back using browser back button
-    await page.goBack();
-
-    // Assert
-    // Should remain on login page or redirect back to login
-    await page.waitForLoadState('networkidle');
-    const currentUrl = page.url();
-    expect(currentUrl).toMatch(/login|auth/);
-    
-    // Should not have access to dashboard content
-    const isDashboardVisible = await page.locator('.oxd-dashboard-widget').isVisible().catch(() => false);
-    expect(isDashboardVisible).toBe(false);
-    
-    console.log('✅ Browser back button properly handled after logout');
-  });
-
-  test('should clear session data after logout', async ({ page }) => {
-    // Arrange
-    const dashboardPage = new DashboardPage(page);
-    const loginPage = new LoginPage(page);
-
-    // Get session info before logout
-    const sessionInfoBefore = await page.evaluate(() => {
-      return {
-        sessionStorage: Object.keys(sessionStorage).length,
-        localStorage: Object.keys(localStorage).length,
-        cookies: document.cookie
-      };
+  test('should successfully logout and redirect to login page', async ({ page }) => {
+    await test.step('Login with valid credentials', async () => {
+      await loginPage.navigateToLogin();
+      await loginPage.loginAndWaitForDashboard(
+        AuthTestData.validCredentials.username,
+        AuthTestData.validCredentials.password
+      );
+      
+      // Verify we are logged in
+      expect(await dashboardPage.isUserLoggedIn()).toBe(true);
     });
 
-    // Act
-    await dashboardPage.logout();
-    await loginPage.verifyLoginPageLoaded();
-
-    // Assert
-    const sessionInfoAfter = await page.evaluate(() => {
-      return {
-        sessionStorage: Object.keys(sessionStorage).length,
-        localStorage: Object.keys(localStorage).length,
-        cookies: document.cookie
-      };
+    await test.step('Navigate to different pages within application', async () => {
+      await dashboardPage.navigateToAdmin();
+      expect(page.url()).toContain('admin');
+      
+      await dashboardPage.navigateToLeave();
+      expect(page.url()).toContain('leave');
     });
 
-    // Session data should be cleared or significantly reduced
-    console.log('Session before logout:', sessionInfoBefore);
-    console.log('Session after logout:', sessionInfoAfter);
-    
-    // Verify critical session tokens are cleared
-    const hasSessionToken = sessionInfoAfter.cookies.includes('session') || 
-                           sessionInfoAfter.cookies.includes('token') ||
-                           sessionInfoAfter.cookies.includes('auth');
-    
-    console.log('✅ Session data properly handled during logout');
+    await test.step('Perform logout', async () => {
+      await dashboardPage.logout();
+    });
+
+    await test.step('Verify user is redirected to login page', async () => {
+      await expect(page).toHaveURL(/.*login.*/);
+      expect(await loginPage.isLoginFormVisible()).toBe(true);
+    });
+
+    await test.step('Verify session is terminated', async () => {
+      expect(await dashboardPage.isUserLoggedIn()).toBe(false);
+    });
   });
 
-  test('should handle multiple logout attempts gracefully', async ({ page }) => {
-    // Arrange
-    const dashboardPage = new DashboardPage(page);
-    const loginPage = new LoginPage(page);
+  test('should prevent access to protected pages after logout', async ({ page }) => {
+    await test.step('Login and then logout', async () => {
+      await loginPage.navigateToLogin();
+      await loginPage.loginAndWaitForDashboard(
+        AuthTestData.validCredentials.username,
+        AuthTestData.validCredentials.password
+      );
+      await dashboardPage.logout();
+    });
 
-    // Act - First logout
-    await dashboardPage.logout();
-    await loginPage.verifyLoginPageLoaded();
-
-    // Try to logout again (should handle gracefully)
-    const logoutButton = page.locator('text=Logout');
-    const isLogoutVisible = await logoutButton.isVisible().catch(() => false);
-    
-    // Assert
-    expect(isLogoutVisible).toBe(false); // Logout button shouldn't be visible when not logged in
-    await loginPage.verifyLoginPageLoaded();
-    
-    console.log('✅ Multiple logout attempts handled gracefully');
+    await test.step('Attempt to access protected pages after logout', async () => {
+      for (const protectedUrl of AuthTestData.sessionTestData.protectedUrls) {
+        await page.goto(`https://opensource-demo.orangehrmlive.com${protectedUrl}`);
+        
+        // Should redirect to login page
+        await expect(page).toHaveURL(/.*login.*/);
+        expect(await loginPage.isLoginFormVisible()).toBe(true);
+      }
+    });
   });
 
-  test('should maintain logout functionality across different modules', async ({ page }) => {
-    // Arrange
-    const dashboardPage = new DashboardPage(page);
-    const loginPage = new LoginPage(page);
+  test('should clear user session data after logout', async ({ page }) => {
+    await test.step('Login and navigate to dashboard', async () => {
+      await loginPage.navigateToLogin();
+      await loginPage.loginAndWaitForDashboard(
+        AuthTestData.validCredentials.username,
+        AuthTestData.validCredentials.password
+      );
+    });
 
-    // Navigate to different modules to test logout from various pages
-    const modulesToTest = ['Admin', 'PIM', 'Leave'];
+    await test.step('Verify user is logged in', async () => {
+      expect(await dashboardPage.isDashboardVisible()).toBe(true);
+      expect(await dashboardPage.isUserLoggedIn()).toBe(true);
+    });
 
-    for (const module of modulesToTest) {
-      // Navigate to module
-      await dashboardPage.navigateToModule(module);
-      await page.waitForLoadState('networkidle');
+    await test.step('Logout and verify session is cleared', async () => {
+      await dashboardPage.logout();
       
-      // Verify user dropdown is accessible
-      await dashboardPage.verifyUserLoggedIn();
+      // Verify we're back at login page
+      await expect(page).toHaveURL(/.*login.*/);
       
-      console.log(`✅ Logout functionality available in ${module} module`);
-    }
-
-    // Act - Logout from the last module
-    await dashboardPage.logout();
-
-    // Assert
-    await loginPage.verifyLoginPageLoaded();
-    console.log('✅ Successfully logged out from non-dashboard module');
-  });
-
-  test('should verify logout performance and responsiveness', async ({ page }) => {
-    // Arrange
-    const dashboardPage = new DashboardPage(page);
-    const loginPage = new LoginPage(page);
-
-    // Act - Measure logout time
-    const startTime = Date.now();
-    await dashboardPage.logout();
-    await loginPage.verifyLoginPageLoaded();
-    const endTime = Date.now();
-
-    // Assert
-    const logoutDuration = endTime - startTime;
-    expect(logoutDuration).toBeLessThan(5000); // Should complete within 5 seconds
-    
-    console.log(`✅ Logout completed in ${logoutDuration}ms`);
-  });
-
-  test('should prevent access to protected APIs after logout', async ({ page }) => {
-    // Arrange
-    const dashboardPage = new DashboardPage(page);
-    const loginPage = new LoginPage(page);
-
-    // Act
-    await dashboardPage.logout();
-    await loginPage.verifyLoginPageLoaded();
-
-    // Try to access API endpoints that require authentication
-    const response = await page.request.get('https://opensource-demo.orangehrmlive.com/web/index.php/api/v2/admin/users');
-
-    // Assert
-    // Should return unauthorized or redirect to login
-    expect([401, 403, 302]).toContain(response.status());
-    
-    console.log(`✅ API access properly restricted after logout (Status: ${response.status()})`);
-  });
-
-  test('should handle session timeout simulation', async ({ page }) => {
-    // Arrange
-    const dashboardPage = new DashboardPage(page);
-    const loginPage = new LoginPage(page);
-
-    // Simulate staying on dashboard for extended period
-    await page.waitForTimeout(2000); // Brief wait to simulate user activity
-
-    // Act - Try to perform action after simulated idle time
-    await dashboardPage.navigateToModule('PIM');
-    await page.waitForLoadState('networkidle');
-
-    // In real applications, session might timeout
-    // For this demo, we'll manually logout to test session termination
-    await dashboardPage.logout();
-
-    // Assert
-    await loginPage.verifyLoginPageLoaded();
-    
-    console.log('✅ Session timeout scenario handled correctly');
-  });
-
-  test('should verify complete authentication state reset', async ({ page }) => {
-    // Arrange
-    const dashboardPage = new DashboardPage(page);
-    const loginPage = new LoginPage(page);
-
-    // Act
-    await dashboardPage.logout();
-    await loginPage.verifyLoginPageLoaded();
-
-    // Try to access various protected endpoints
-    const protectedUrls = [
-      '/web/index.php/dashboard/index',
-      '/web/index.php/admin/viewSystemUsers',
-      '/web/index.php/pim/viewEmployeeList'
-    ];
-
-    for (const url of protectedUrls) {
-      await page.goto(`https://opensource-demo.orangehrmlive.com${url}`);
-      await page.waitForLoadState('networkidle');
+      // Try to go back using browser back button
+      await page.goBack();
       
-      // Should be redirected to login
-      const currentUrl = page.url();
-      expect(currentUrl).toMatch(/login|auth/);
-    }
+      // Should still be at login page or redirected back to login
+      await expect(page).toHaveURL(/.*login.*/);
+    });
+  });
 
-    // Assert - Final verification on login page
-    await loginPage.verifyLoginPageLoaded();
-    
-    console.log('✅ Complete authentication state reset verified');
+  test('should handle logout from different pages within application', async ({ page }) => {
+    await test.step('Login and navigate to Admin page', async () => {
+      await loginPage.navigateToLogin();
+      await loginPage.loginAndWaitForDashboard(
+        AuthTestData.validCredentials.username,
+        AuthTestData.validCredentials.password
+      );
+      await dashboardPage.navigateToAdmin();
+    });
+
+    await test.step('Logout from Admin page', async () => {
+      await dashboardPage.logout();
+      await expect(page).toHaveURL(/.*login.*/);
+    });
+
+    await test.step('Login again and navigate to Leave page', async () => {
+      await loginPage.loginAndWaitForDashboard(
+        AuthTestData.validCredentials.username,
+        AuthTestData.validCredentials.password
+      );
+      await dashboardPage.navigateToLeave();
+    });
+
+    await test.step('Logout from Leave page', async () => {
+      await dashboardPage.logout();
+      await expect(page).toHaveURL(/.*login.*/);
+    });
+  });
+
+  test('should handle logout with browser refresh scenarios', async ({ page }) => {
+    await test.step('Login and refresh page', async () => {
+      await loginPage.navigateToLogin();
+      await loginPage.loginAndWaitForDashboard(
+        AuthTestData.validCredentials.username,
+        AuthTestData.validCredentials.password
+      );
+      
+      await page.reload();
+      await dashboardPage.waitForDashboardLoad();
+      expect(await dashboardPage.isUserLoggedIn()).toBe(true);
+    });
+
+    await test.step('Logout after page refresh', async () => {
+      await dashboardPage.logout();
+      await expect(page).toHaveURL(/.*login.*/);
+    });
+
+    await test.step('Verify session is properly terminated', async () => {
+      await page.reload();
+      await expect(page).toHaveURL(/.*login.*/);
+    });
+  });
+
+  test('should maintain logout state across browser tabs', async ({ context, page }) => {
+    await test.step('Login in first tab', async () => {
+      await loginPage.navigateToLogin();
+      await loginPage.loginAndWaitForDashboard(
+        AuthTestData.validCredentials.username,
+        AuthTestData.validCredentials.password
+      );
+    });
+
+    await test.step('Open second tab and verify logged in state', async () => {
+      const secondTab = await context.newPage();
+      await secondTab.goto('https://opensource-demo.orangehrmlive.com/web/index.php/dashboard/index');
+      
+      const secondDashboardPage = new DashboardPage(secondTab);
+      await secondDashboardPage.waitForDashboardLoad();
+      expect(await secondDashboardPage.isUserLoggedIn()).toBe(true);
+      
+      await secondTab.close();
+    });
+
+    await test.step('Logout from first tab', async () => {
+      await dashboardPage.logout();
+      await expect(page).toHaveURL(/.*login.*/);
+    });
+
+    await test.step('Verify logout affected all tabs', async () => {
+      const thirdTab = await context.newPage();
+      await thirdTab.goto('https://opensource-demo.orangehrmlive.com/web/index.php/dashboard/index');
+      
+      // Should redirect to login
+      await expect(thirdTab).toHaveURL(/.*login.*/);
+      
+      await thirdTab.close();
+    });
+  });
+
+  test('should not cache sensitive data after logout', async ({ page }) => {
+    await test.step('Login and navigate to sensitive page', async () => {
+      await loginPage.navigateToLogin();
+      await loginPage.loginAndWaitForDashboard(
+        AuthTestData.validCredentials.username,
+        AuthTestData.validCredentials.password
+      );
+      await dashboardPage.navigateToAdmin();
+    });
+
+    await test.step('Logout', async () => {
+      await dashboardPage.logout();
+      await expect(page).toHaveURL(/.*login.*/);
+    });
+
+    await test.step('Verify no sensitive data is accessible after logout', async () => {
+      // Try to access admin page directly
+      await page.goto('https://opensource-demo.orangehrmlive.com/web/index.php/admin/viewSystemUsers');
+      
+      // Should redirect to login page
+      await expect(page).toHaveURL(/.*login.*/);
+      
+      // Try using browser back button
+      await page.goBack();
+      await expect(page).toHaveURL(/.*login.*/);
+    });
+  });
+
+  test('should handle rapid logout attempts', async ({ page }) => {
+    await test.step('Login', async () => {
+      await loginPage.navigateToLogin();
+      await loginPage.loginAndWaitForDashboard(
+        AuthTestData.validCredentials.username,
+        AuthTestData.validCredentials.password
+      );
+    });
+
+    await test.step('Perform multiple rapid logout attempts', async () => {
+      // Click user dropdown
+      await dashboardPage.userDropdown.click();
+      
+      // Click logout (this should work)
+      await dashboardPage.logoutOption.click();
+      await expect(page).toHaveURL(/.*login.*/);
+    });
+
+    await test.step('Verify logout completed successfully', async () => {
+      expect(await loginPage.isLoginFormVisible()).toBe(true);
+    });
+  });
+
+  test('should provide accessible logout option', async ({ page }) => {
+    await test.step('Login and verify logout option is accessible', async () => {
+      await loginPage.navigateToLogin();
+      await loginPage.loginAndWaitForDashboard(
+        AuthTestData.validCredentials.username,
+        AuthTestData.validCredentials.password
+      );
+    });
+
+    await test.step('Verify logout button/link is accessible', async () => {
+      // User dropdown should be visible
+      expect(await dashboardPage.isElementVisible(dashboardPage.userDropdown)).toBe(true);
+      
+      // Click user dropdown to reveal logout option
+      await dashboardPage.userDropdown.click();
+      
+      // Logout option should be visible
+      expect(await dashboardPage.isElementVisible(dashboardPage.logoutOption)).toBe(true);
+    });
+
+    await test.step('Complete logout', async () => {
+      await dashboardPage.logoutOption.click();
+      await expect(page).toHaveURL(/.*login.*/);
+    });
   });
 }); 

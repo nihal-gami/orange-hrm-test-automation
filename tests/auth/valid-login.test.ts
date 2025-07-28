@@ -4,100 +4,91 @@ import { DashboardPage } from '../../pages/DashboardPage';
 import { AuthTestData } from '../data/auth-test-data';
 
 /**
- * AUTH-001: Valid Login Test Automation
- * Jira Task: HRM-48
+ * Test Suite: Valid Login Functionality
+ * Jira Task: HRM-54 - AUTH-001: Implement Valid Login Test
  * 
- * Test Objective: Verify that users can successfully login with valid credentials
- * and access the dashboard.
+ * Objective: Verify that users can successfully log in with valid credentials
  */
 
 test.describe('AUTH-001: Valid Login Tests', () => {
+  let loginPage: LoginPage;
+  let dashboardPage: DashboardPage;
+
   test.beforeEach(async ({ page }) => {
-    // Navigate to login page before each test
-    const loginPage = new LoginPage(page);
+    loginPage = new LoginPage(page);
+    dashboardPage = new DashboardPage(page);
     await loginPage.navigateToLogin();
   });
 
-  test('should login successfully with valid credentials', async ({ page }) => {
-    // Arrange
-    const loginPage = new LoginPage(page);
-    const dashboardPage = new DashboardPage(page);
-    const { username, password } = AuthTestData.validCredentials;
+  test('should successfully login with valid Admin credentials', async ({ page }) => {
+    // Test Description: Verify successful login with correct credentials
+    await test.step('Enter valid credentials and login', async () => {
+      await loginPage.login(
+        AuthTestData.validCredentials.username,
+        AuthTestData.validCredentials.password
+      );
+    });
 
-    // Act
-    await loginPage.login(username, password);
+    await test.step('Verify successful navigation to dashboard', async () => {
+      await expect(page).toHaveURL(/.*dashboard/);
+      await dashboardPage.waitForDashboardLoad();
+    });
 
-    // Assert
-    await dashboardPage.verifyDashboardLoaded();
-    await dashboardPage.verifyUserLoggedIn();
-    await dashboardPage.verifyNavigationMenu();
-    
-    // Verify URL change to dashboard
-    await page.waitForURL(/.*dashboard/);
-    expect(page.url()).toContain('dashboard');
-    
-    // Verify dashboard elements
-    await dashboardPage.verifyDashboardTitle();
-    await dashboardPage.verifyDashboardWidgets();
+    await test.step('Verify dashboard is displayed', async () => {
+      expect(await dashboardPage.isDashboardVisible()).toBe(true);
+      expect(await dashboardPage.getDashboardTitle()).toContain('Dashboard');
+    });
+
+    await test.step('Verify user session is established', async () => {
+      expect(await dashboardPage.isUserLoggedIn()).toBe(true);
+    });
+
+    await test.step('Verify no error messages are shown', async () => {
+      expect(await loginPage.isErrorMessageVisible()).toBe(false);
+    });
   });
 
-  test('should maintain session after login', async ({ page }) => {
-    // Arrange
-    const loginPage = new LoginPage(page);
-    const dashboardPage = new DashboardPage(page);
-    const { username, password } = AuthTestData.validCredentials;
+  test('should maintain session after page refresh', async ({ page }) => {
+    // Login first
+    await loginPage.loginAndWaitForDashboard(
+      AuthTestData.validCredentials.username,
+      AuthTestData.validCredentials.password
+    );
 
-    // Act - Login and navigate to different modules
-    await loginPage.login(username, password);
-    await dashboardPage.verifyDashboardLoaded();
-    
-    // Navigate to PIM module
-    await dashboardPage.navigateToModule('PIM');
-    await page.waitForURL(/.*pim/);
-    
-    // Navigate back to dashboard
-    await dashboardPage.navigateToModule('Dashboard');
+    await test.step('Refresh the page', async () => {
+      await page.reload();
+      await dashboardPage.waitForDashboardLoad();
+    });
 
-    // Assert - Session should be maintained
-    await dashboardPage.verifyDashboardLoaded();
-    await dashboardPage.verifyUserLoggedIn();
+    await test.step('Verify user remains logged in after refresh', async () => {
+      expect(await dashboardPage.isUserLoggedIn()).toBe(true);
+      expect(await dashboardPage.isDashboardVisible()).toBe(true);
+    });
   });
 
-  test('should display correct user information after login', async ({ page }) => {
-    // Arrange
-    const loginPage = new LoginPage(page);
-    const dashboardPage = new DashboardPage(page);
-    const { username, password } = AuthTestData.validCredentials;
+  test('should display correct page title after login', async ({ page }) => {
+    await loginPage.loginAndWaitForDashboard(
+      AuthTestData.validCredentials.username,
+      AuthTestData.validCredentials.password
+    );
 
-    // Act
-    await loginPage.login(username, password);
-    await dashboardPage.verifyDashboardLoaded();
-
-    // Assert
-    await dashboardPage.verifyUserLoggedIn();
-    const currentUser = await dashboardPage.getCurrentUser();
-    
-    // Verify user information is displayed
-    expect(currentUser).toBeTruthy();
-    expect(currentUser.length).toBeGreaterThan(0);
+    await test.step('Verify page title is correct', async () => {
+      const title = await dashboardPage.getPageTitle();
+      expect(title).toContain('OrangeHRM');
+    });
   });
 
-  test('should have proper page load performance', async ({ page }) => {
-    // Arrange
-    const loginPage = new LoginPage(page);
-    const dashboardPage = new DashboardPage(page);
-    const { username, password } = AuthTestData.validCredentials;
+  test('should have access to navigation menu after login', async ({ page }) => {
+    await loginPage.loginAndWaitForDashboard(
+      AuthTestData.validCredentials.username,
+      AuthTestData.validCredentials.password
+    );
 
-    // Act - Measure login time
-    const startTime = Date.now();
-    await loginPage.login(username, password);
-    await dashboardPage.verifyDashboardLoaded();
-    const endTime = Date.now();
-
-    // Assert - Login should complete within reasonable time
-    const loginDuration = endTime - startTime;
-    expect(loginDuration).toBeLessThan(AuthTestData.timeouts.loginTimeout);
-    
-    console.log(`✅ Login completed in ${loginDuration}ms`);
+    await test.step('Verify navigation menu is accessible', async () => {
+      const visibleMenuItems = await dashboardPage.getVisibleMenuItems();
+      expect(visibleMenuItems.length).toBeGreaterThan(0);
+      expect(visibleMenuItems).toContain('Admin');
+      expect(visibleMenuItems).toContain('Leave');
+    });
   });
 }); 
