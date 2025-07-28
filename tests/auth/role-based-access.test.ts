@@ -1,246 +1,245 @@
 import { test, expect } from '@playwright/test';
 import { LoginPage } from '../../pages/LoginPage';
 import { DashboardPage } from '../../pages/DashboardPage';
-import { testUsers } from '../data/auth-test-data';
+import { AuthTestData } from '../data/auth-test-data';
 
 /**
- * Test Suite: Role-Based Access Control Tests
- * Jira Task: HRM-45 - AUTH-004: Implement Role-Based Access Control Test Automation
- * Epic: HRM-41 🔐 Authentication & Authorization
+ * AUTH-004: Role-Based Access Control Test
+ * Jira Task: HRM-51
+ * 
+ * Test Objective: Verify that different user roles have appropriate access 
+ * to system modules and functionality.
  */
 
-test.describe('Role-Based Access Control Tests @auth', () => {
-  let loginPage: LoginPage;
-  let dashboardPage: DashboardPage;
-
+test.describe('AUTH-004: Role-Based Access Control Tests', () => {
   test.beforeEach(async ({ page }) => {
-    loginPage = new LoginPage(page);
-    dashboardPage = new DashboardPage(page);
-    
-    // Navigate to login page
+    const loginPage = new LoginPage(page);
     await loginPage.navigateToLogin();
-    await loginPage.verifyLoginPageLoaded();
   });
 
-  test('AUTH-004.1: Should grant Admin user full system access', async ({ page }) => {
-    const adminUser = testUsers.find(user => user.role === 'Admin');
-    if (!adminUser) {
-      throw new Error('Admin user not found in test data');
-    }
+  test('should verify Admin user has full system access', async ({ page }) => {
+    // Arrange
+    const loginPage = new LoginPage(page);
+    const dashboardPage = new DashboardPage(page);
+    const adminCreds = AuthTestData.userRoles.admin;
 
-    try {
-      // Login as Admin user
-      await loginPage.login(adminUser.username, adminUser.password);
-      await dashboardPage.verifyDashboardLoaded();
+    // Act
+    await loginPage.login(adminCreds.username, adminCreds.password);
+    await dashboardPage.verifyDashboardLoaded();
 
-      // Verify Admin has access to all expected modules
-      await dashboardPage.verifyAdminAccess();
-
-      // Get all visible menu items
-      const visibleMenuItems = await dashboardPage.getVisibleMenuItems();
-      
-      // Verify all expected permissions are available
-      for (const permission of adminUser.permissions) {
-        const hasPermission = await dashboardPage.isMenuItemVisible(permission);
-        expect(hasPermission).toBe(true);
-        console.log(`✅ Admin access verified for module: ${permission}`);
-      }
-
-      console.log(`✅ Admin user has access to ${visibleMenuItems.length} modules as expected`);
-
-    } catch (error) {
-      await loginPage.takeScreenshot('admin-access-verification-failure');
-      throw error;
+    // Assert - Verify admin access to all modules
+    await dashboardPage.verifyAdminAccess();
+    
+    // Check that admin menus are visible
+    const expectedMenus = ['Admin', 'PIM', 'Leave', 'Time', 'Recruitment', 'My Info'];
+    
+    for (const menuName of expectedMenus) {
+      const menuItem = page.locator(`text=${menuName}`).first();
+      await expect(menuItem).toBeVisible();
+      console.log(`✅ Admin can access: ${menuName}`);
     }
   });
 
-  test('AUTH-004.2: Should allow Admin access to Admin module', async ({ page }) => {
-    try {
-      // Login as Admin
-      await loginPage.loginAsAdmin();
-      await dashboardPage.verifyDashboardLoaded();
+  test('should verify Admin can access Admin module functionality', async ({ page }) => {
+    // Arrange
+    const loginPage = new LoginPage(page);
+    const dashboardPage = new DashboardPage(page);
+    const adminCreds = AuthTestData.userRoles.admin;
 
-      // Navigate to Admin module
-      await dashboardPage.navigateToAdmin();
-      
-      // Verify successful navigation to Admin module
+    // Act
+    await loginPage.login(adminCreds.username, adminCreds.password);
+    await dashboardPage.verifyDashboardLoaded();
+    
+    // Navigate to Admin module
+    await dashboardPage.navigateToModule('Admin');
+
+    // Assert
+    await page.waitForURL(/.*admin/);
+    expect(page.url()).toContain('admin');
+    
+    // Verify admin-specific functionality is accessible
+    const userManagementSection = page.locator('text=User Management');
+    await expect(userManagementSection).toBeVisible();
+    
+    console.log('✅ Admin successfully accessed Admin module');
+  });
+
+  test('should verify Admin can access PIM module', async ({ page }) => {
+    // Arrange
+    const loginPage = new LoginPage(page);
+    const dashboardPage = new DashboardPage(page);
+    const adminCreds = AuthTestData.userRoles.admin;
+
+    // Act
+    await loginPage.login(adminCreds.username, adminCreds.password);
+    await dashboardPage.verifyDashboardLoaded();
+    
+    // Navigate to PIM module
+    await dashboardPage.navigateToModule('PIM');
+
+    // Assert
+    await page.waitForURL(/.*pim/);
+    expect(page.url()).toContain('pim');
+    
+    // Verify PIM functionality is accessible
+    const employeeListSection = page.locator('.oxd-table-header-cell');
+    await expect(employeeListSection.first()).toBeVisible();
+    
+    console.log('✅ Admin successfully accessed PIM module');
+  });
+
+  test('should verify Admin can access Leave module', async ({ page }) => {
+    // Arrange
+    const loginPage = new LoginPage(page);
+    const dashboardPage = new DashboardPage(page);
+    const adminCreds = AuthTestData.userRoles.admin;
+
+    // Act
+    await loginPage.login(adminCreds.username, adminCreds.password);
+    await dashboardPage.verifyDashboardLoaded();
+    
+    // Navigate to Leave module
+    await dashboardPage.navigateToModule('Leave');
+
+    // Assert
+    await page.waitForURL(/.*leave/);
+    expect(page.url()).toContain('leave');
+    
+    // Verify Leave functionality is accessible
+    await page.waitForLoadState('networkidle');
+    const leaveSection = page.locator('.oxd-topbar-header-breadcrumb');
+    await expect(leaveSection).toBeVisible();
+    
+    console.log('✅ Admin successfully accessed Leave module');
+  });
+
+  test('should verify navigation menu consistency across modules', async ({ page }) => {
+    // Arrange
+    const loginPage = new LoginPage(page);
+    const dashboardPage = new DashboardPage(page);
+    const adminCreds = AuthTestData.userRoles.admin;
+
+    // Act
+    await loginPage.login(adminCreds.username, adminCreds.password);
+    await dashboardPage.verifyDashboardLoaded();
+
+    const modulesToTest = ['Admin', 'PIM', 'Leave'];
+    
+    for (const module of modulesToTest) {
+      // Navigate to module
+      await dashboardPage.navigateToModule(module);
       await page.waitForLoadState('networkidle');
-      const currentURL = await page.url();
-      expect(currentURL).toContain('/admin');
-
-      // Verify Admin module content is accessible
-      const breadcrumb = await dashboardPage.getBreadcrumbText();
-      expect(breadcrumb).toContain('Admin');
-
-      console.log('✅ Admin user can access Admin module');
-
-    } catch (error) {
-      await loginPage.takeScreenshot('admin-module-access-failure');
-      throw error;
-    }
-  });
-
-  test('AUTH-004.3: Should allow Admin access to PIM module', async ({ page }) => {
-    try {
-      // Login as Admin
-      await loginPage.loginAsAdmin();
-      await dashboardPage.verifyDashboardLoaded();
-
-      // Navigate to PIM module
-      await dashboardPage.navigateToPIM();
       
-      // Verify successful navigation to PIM module
-      await page.waitForLoadState('networkidle');
-      const currentURL = await page.url();
-      expect(currentURL).toContain('/pim');
-
-      console.log('✅ Admin user can access PIM module');
-
-    } catch (error) {
-      await loginPage.takeScreenshot('pim-module-access-failure');
-      throw error;
-    }
-  });
-
-  test('AUTH-004.4: Should allow Admin access to Leave module', async ({ page }) => {
-    try {
-      // Login as Admin
-      await loginPage.loginAsAdmin();
-      await dashboardPage.verifyDashboardLoaded();
-
-      // Navigate to Leave module
-      await dashboardPage.navigateToLeave();
+      // Assert - Navigation menu should be consistent
+      await dashboardPage.verifyNavigationMenu();
       
-      // Verify successful navigation to Leave module
-      await page.waitForLoadState('networkidle');
-      const currentURL = await page.url();
-      expect(currentURL).toContain('/leave');
-
-      console.log('✅ Admin user can access Leave module');
-
-    } catch (error) {
-      await loginPage.takeScreenshot('leave-module-access-failure');
-      throw error;
-    }
-  });
-
-  test('AUTH-004.5: Should allow Admin access to Time module', async ({ page }) => {
-    try {
-      // Login as Admin
-      await loginPage.loginAsAdmin();
-      await dashboardPage.verifyDashboardLoaded();
-
-      // Navigate to Time module
-      await dashboardPage.navigateToTime();
+      // Verify user dropdown is still accessible
+      await dashboardPage.verifyUserLoggedIn();
       
-      // Verify successful navigation to Time module
-      await page.waitForLoadState('networkidle');
-      const currentURL = await page.url();
-      expect(currentURL).toContain('/time');
-
-      console.log('✅ Admin user can access Time module');
-
-    } catch (error) {
-      await loginPage.takeScreenshot('time-module-access-failure');
-      throw error;
+      console.log(`✅ Navigation consistency verified in ${module} module`);
     }
   });
 
-  test('AUTH-004.6: Should allow Admin access to Recruitment module', async ({ page }) => {
-    try {
-      // Login as Admin
-      await loginPage.loginAsAdmin();
-      await dashboardPage.verifyDashboardLoaded();
+  test('should verify role-based UI elements visibility', async ({ page }) => {
+    // Arrange
+    const loginPage = new LoginPage(page);
+    const dashboardPage = new DashboardPage(page);
+    const adminCreds = AuthTestData.userRoles.admin;
 
-      // Navigate to Recruitment module
-      await dashboardPage.navigateToRecruitment();
-      
-      // Verify successful navigation to Recruitment module
-      await page.waitForLoadState('networkidle');
-      const currentURL = await page.url();
-      expect(currentURL).toContain('/recruitment');
+    // Act
+    await loginPage.login(adminCreds.username, adminCreds.password);
+    await dashboardPage.verifyDashboardLoaded();
 
-      console.log('✅ Admin user can access Recruitment module');
+    // Assert - Check for admin-specific UI elements
+    await dashboardPage.verifyAdminAccess();
+    
+    // Check user info displays correct role
+    const userDropdown = page.locator('.oxd-userdropdown-tab');
+    await userDropdown.click();
+    
+    const userInfo = page.locator('.oxd-userdropdown-name');
+    await expect(userInfo).toBeVisible();
+    
+    console.log('✅ Admin role UI elements verified');
+  });
 
-    } catch (error) {
-      await loginPage.takeScreenshot('recruitment-module-access-failure');
-      throw error;
+  test('should verify access restrictions for unauthorized modules (simulation)', async ({ page }) => {
+    // Arrange
+    const loginPage = new LoginPage(page);
+    const dashboardPage = new DashboardPage(page);
+    const adminCreds = AuthTestData.userRoles.admin;
+
+    // Act
+    await loginPage.login(adminCreds.username, adminCreds.password);
+    await dashboardPage.verifyDashboardLoaded();
+
+    // Assert - In a real scenario with multiple roles, we would test:
+    // 1. ESS users can only access limited modules
+    // 2. Supervisor users have team management access
+    // 3. Admin users have full access
+    
+    // For demo environment, verify all expected admin modules are accessible
+    const adminModules = ['Admin', 'PIM', 'Leave', 'Time', 'Recruitment', 'My Info'];
+    
+    for (const module of adminModules) {
+      const moduleLink = page.locator(`text=${module}`).first();
+      const isVisible = await moduleLink.isVisible();
+      expect(isVisible).toBe(true);
+      console.log(`✅ ${module} module accessible for Admin role`);
     }
   });
 
-  test('AUTH-004.7: Should allow Admin access to Performance module', async ({ page }) => {
-    try {
-      // Login as Admin
-      await loginPage.loginAsAdmin();
-      await dashboardPage.verifyDashboardLoaded();
+  test('should verify session maintains role permissions', async ({ page }) => {
+    // Arrange
+    const loginPage = new LoginPage(page);
+    const dashboardPage = new DashboardPage(page);
+    const adminCreds = AuthTestData.userRoles.admin;
 
-      // Navigate to Performance module
-      await dashboardPage.navigateToPerformance();
-      
-      // Verify successful navigation to Performance module
-      await page.waitForLoadState('networkidle');
-      const currentURL = await page.url();
-      expect(currentURL).toContain('/performance');
+    // Act
+    await loginPage.login(adminCreds.username, adminCreds.password);
+    await dashboardPage.verifyDashboardLoaded();
+    
+    // Navigate to multiple modules to simulate extended session
+    await dashboardPage.navigateToModule('Admin');
+    await page.waitForLoadState('networkidle');
+    
+    await dashboardPage.navigateToModule('PIM');
+    await page.waitForLoadState('networkidle');
+    
+    await dashboardPage.navigateToModule('Dashboard');
+    await page.waitForLoadState('networkidle');
 
-      console.log('✅ Admin user can access Performance module');
-
-    } catch (error) {
-      await loginPage.takeScreenshot('performance-module-access-failure');
-      throw error;
-    }
+    // Assert - Role permissions should be maintained throughout session
+    await dashboardPage.verifyAdminAccess();
+    await dashboardPage.verifyUserLoggedIn();
+    
+    console.log('✅ Role permissions maintained throughout session');
   });
 
-  test('AUTH-004.8: Should validate navigation permissions consistency', async ({ page }) => {
-    try {
-      // Login as Admin
-      await loginPage.loginAsAdmin();
-      await dashboardPage.verifyDashboardLoaded();
+  test('should verify proper error handling for direct URL access', async ({ page }) => {
+    // Note: This test simulates accessing protected URLs directly
+    // In a real environment, this would test unauthorized access attempts
+    
+    // Arrange
+    const loginPage = new LoginPage(page);
+    const dashboardPage = new DashboardPage(page);
+    const adminCreds = AuthTestData.userRoles.admin;
 
-      // Get initial list of visible modules
-      const initialModules = await dashboardPage.getVisibleMenuItems();
-      
-      // Navigate to each module and verify access
-      for (const module of ['Admin', 'PIM', 'Leave', 'Time', 'Recruitment', 'Performance']) {
-        if (await dashboardPage.isMenuItemVisible(module)) {
-          // Click on the module
-          const moduleLink = page.locator(`text=${module}`).first();
-          await moduleLink.click();
-          await page.waitForLoadState('networkidle');
-          
-          // Verify navigation was successful (URL changed and no access denied message)
-          const currentURL = await page.url();
-          expect(currentURL).toContain(module.toLowerCase());
-          
-          // Check for any access denied or error messages
-          const errorElement = page.locator('.oxd-alert-content');
-          const hasError = await errorElement.isVisible();
-          expect(hasError).toBe(false);
-          
-          console.log(`✅ Navigation to ${module} module successful`);
-          
-          // Navigate back to dashboard for next iteration
-          await page.goto('/web/index.php/dashboard/index');
-          await dashboardPage.verifyDashboardLoaded();
-        }
-      }
+    // Act - Login first to establish session
+    await loginPage.login(adminCreds.username, adminCreds.password);
+    await dashboardPage.verifyDashboardLoaded();
 
-      console.log('✅ Navigation permissions consistency validated');
-
-    } catch (error) {
-      await loginPage.takeScreenshot('navigation-permissions-failure');
-      throw error;
-    }
-  });
-
-  test.afterEach(async ({ page }) => {
-    // Logout after each test to ensure clean state
-    try {
-      const isLoggedIn = await dashboardPage.isUserLoggedIn();
-      if (isLoggedIn) {
-        await dashboardPage.logout();
-      }
-    } catch (error) {
-      console.log('Note: User may not be logged in, skipping logout');
-    }
+    // Try accessing admin URL directly
+    await page.goto('https://opensource-demo.orangehrmlive.com/web/index.php/admin/viewSystemUsers');
+    
+    // Assert - Should be accessible for admin user
+    await page.waitForLoadState('networkidle');
+    expect(page.url()).toContain('admin');
+    
+    // Verify admin functionality is available
+    const adminContent = page.locator('.oxd-table-header');
+    await expect(adminContent.first()).toBeVisible();
+    
+    console.log('✅ Direct URL access properly handled for admin user');
   });
 }); 

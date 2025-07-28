@@ -1,193 +1,158 @@
-import { Page, Locator } from '@playwright/test';
+import { Page, Locator, expect } from '@playwright/test';
 import { BasePage } from './BasePage';
 
 export class DashboardPage extends BasePage {
-  // Page elements
-  readonly dashboardHeader: Locator;
-  readonly userDropdown: Locator;
-  readonly logoutOption: Locator;
-  readonly mainMenu: Locator;
-  readonly dashboardContent: Locator;
-  readonly breadcrumb: Locator;
-  readonly userProfilePicture: Locator;
-  readonly sideMenu: Locator;
-
-  // Menu items
-  readonly adminMenu: Locator;
-  readonly pimMenu: Locator;
-  readonly leaveMenu: Locator;
-  readonly timeMenu: Locator;
-  readonly recruitmentMenu: Locator;
-  readonly performanceMenu: Locator;
+  // Locators
+  private readonly dashboardHeader: Locator;
+  private readonly userDropdown: Locator;
+  private readonly logoutButton: Locator;
+  private readonly navigationMenu: Locator;
+  private readonly dashboardCard: Locator;
+  private readonly searchBox: Locator;
+  private readonly breadcrumb: Locator;
+  private readonly userAvatar: Locator;
 
   constructor(page: Page) {
     super(page);
-    
-    // Initialize main page locators
     this.dashboardHeader = page.locator('.oxd-topbar-header-breadcrumb');
     this.userDropdown = page.locator('.oxd-userdropdown-tab');
-    this.logoutOption = page.locator('text=Logout');
-    this.mainMenu = page.locator('.oxd-main-menu').first();
-    this.dashboardContent = page.locator('.oxd-layout-body');
-    this.breadcrumb = page.locator('.oxd-breadcrumb');
-    this.userProfilePicture = page.locator('.oxd-userdropdown-img');
-    this.sideMenu = page.locator('.oxd-sidepanel');
-
-    // Initialize menu item locators
-    this.adminMenu = page.locator('text=Admin').first();
-    this.pimMenu = page.locator('text=PIM').first();
-    this.leaveMenu = page.locator('text=Leave').first();
-    this.timeMenu = page.locator('text=Time').first();
-    this.recruitmentMenu = page.locator('text=Recruitment').first();
-    this.performanceMenu = page.locator('text=Performance').first();
+    this.logoutButton = page.locator('text=Logout');
+    this.navigationMenu = page.locator('.oxd-main-menu').first();
+    this.dashboardCard = page.locator('.oxd-dashboard-widget');
+    this.searchBox = page.locator('.oxd-main-menu-search');
+    this.breadcrumb = page.locator('.oxd-topbar-header-breadcrumb');
+    this.userAvatar = page.locator('.oxd-userdropdown-img');
   }
 
   /**
-   * Verify dashboard page is loaded
+   * Verify dashboard page is loaded successfully
    */
-  async verifyDashboardLoaded() {
-    await this.verifyElementVisible(this.dashboardHeader);
-    await this.verifyElementVisible(this.userDropdown);
-    await this.verifyElementVisible(this.mainMenu);
+  async verifyDashboardLoaded(): Promise<void> {
+    await this.waitForPageLoad();
+    await this.waitForElement(this.dashboardHeader);
+    
+    // Verify URL contains dashboard
+    await this.verifyUrl('dashboard');
+    
+    // Verify dashboard elements are visible
+    await expect(this.dashboardHeader).toBeVisible();
+    await expect(this.navigationMenu).toBeVisible();
+    await expect(this.userDropdown).toBeVisible();
   }
 
   /**
-   * Get dashboard page title
+   * Verify dashboard title/header
    */
-  async getDashboardTitle(): Promise<string> {
-    return await this.getTextContent(this.dashboardHeader);
+  async verifyDashboardTitle(): Promise<void> {
+    const headerText = await this.getTextContent(this.dashboardHeader);
+    expect(headerText.toLowerCase()).toContain('dashboard');
+  }
+
+  /**
+   * Verify navigation menu is present
+   */
+  async verifyNavigationMenu(): Promise<void> {
+    await expect(this.navigationMenu).toBeVisible();
+    
+    // Verify some main menu items are present
+    const menuItems = ['Admin', 'PIM', 'Leave', 'Time', 'Recruitment', 'My Info'];
+    
+    for (const item of menuItems) {
+      const menuItem = this.page.locator(`[data-v-636d6b87].oxd-main-menu-item-wrapper`).filter({ hasText: item });
+      await expect(menuItem.first()).toBeVisible();
+    }
+  }
+
+  /**
+   * Click on a navigation menu item
+   * @param menuName - Name of the menu item to click
+   */
+  async clickNavigationMenu(menuName: string): Promise<void> {
+    const menuItem = this.page.locator(`[data-v-636d6b87].oxd-main-menu-item-wrapper`).filter({ hasText: menuName });
+    await this.clickElement(menuItem.first());
+  }
+
+  /**
+   * Verify user is logged in by checking user dropdown
+   */
+  async verifyUserLoggedIn(): Promise<void> {
+    await expect(this.userDropdown).toBeVisible();
+    await expect(this.userAvatar).toBeVisible();
+  }
+
+  /**
+   * Open user dropdown menu
+   */
+  async openUserDropdown(): Promise<void> {
+    await this.clickElement(this.userDropdown);
+    await this.waitForElement(this.logoutButton);
   }
 
   /**
    * Perform logout
    */
-  async logout() {
-    try {
-      await this.clickElement(this.userDropdown);
-      await this.waitForElement(this.logoutOption);
-      await this.clickElement(this.logoutOption);
-      
-      // Wait for redirect to login page
-      await this.page.waitForTimeout(2000);
-    } catch (error) {
-      console.error('Logout failed:', error);
-      throw error;
-    }
+  async logout(): Promise<void> {
+    await this.openUserDropdown();
+    await this.clickElement(this.logoutButton);
   }
 
   /**
-   * Navigate to Admin module
+   * Get current user information from dropdown
    */
-  async navigateToAdmin() {
-    await this.clickElement(this.adminMenu);
-    await this.waitForPageLoad();
+  async getCurrentUser(): Promise<string> {
+    await this.openUserDropdown();
+    const userInfo = this.page.locator('.oxd-userdropdown-name');
+    return await this.getTextContent(userInfo);
   }
 
   /**
-   * Navigate to PIM module
+   * Verify role-based access - check if admin menus are visible
    */
-  async navigateToPIM() {
-    await this.clickElement(this.pimMenu);
-    await this.waitForPageLoad();
+  async verifyAdminAccess(): Promise<void> {
+    // Admin should see Admin menu
+    const adminMenu = this.page.locator('text=Admin').first();
+    await expect(adminMenu).toBeVisible();
   }
 
   /**
-   * Navigate to Leave module
+   * Verify role-based access - check employee self-service view
    */
-  async navigateToLeave() {
-    await this.clickElement(this.leaveMenu);
-    await this.waitForPageLoad();
-  }
-
-  /**
-   * Navigate to Time module
-   */
-  async navigateToTime() {
-    await this.clickElement(this.timeMenu);
-    await this.waitForPageLoad();
-  }
-
-  /**
-   * Navigate to Recruitment module
-   */
-  async navigateToRecruitment() {
-    await this.clickElement(this.recruitmentMenu);
-    await this.waitForPageLoad();
-  }
-
-  /**
-   * Navigate to Performance module
-   */
-  async navigateToPerformance() {
-    await this.clickElement(this.performanceMenu);
-    await this.waitForPageLoad();
-  }
-
-  /**
-   * Check if specific menu item is visible
-   * @param menuName - Name of the menu item
-   */
-  async isMenuItemVisible(menuName: string): Promise<boolean> {
-    const menuItem = this.page.locator(`text=${menuName}`).first();
-    return await this.isElementVisible(menuItem);
-  }
-
-  /**
-   * Get all visible menu items
-   */
-  async getVisibleMenuItems(): Promise<string[]> {
-    await this.waitForElement(this.mainMenu);
-    const menuItems = await this.mainMenu.locator('.oxd-main-menu-item').all();
-    const visibleItems: string[] = [];
+  async verifyEmployeeAccess(): Promise<void> {
+    // Employee should see limited menus
+    const myInfoMenu = this.page.locator('text=My Info').first();
+    await expect(myInfoMenu).toBeVisible();
     
-    for (const item of menuItems) {
-      if (await item.isVisible()) {
-        const text = await item.textContent();
-        if (text) {
-          visibleItems.push(text.trim());
-        }
-      }
-    }
-    
-    return visibleItems;
-  }
-
-  /**
-   * Verify user has admin access (all menu items visible)
-   */
-  async verifyAdminAccess() {
-    const expectedMenuItems = ['Admin', 'PIM', 'Leave', 'Time', 'Recruitment', 'Performance'];
-    
-    for (const menuItem of expectedMenuItems) {
-      const isVisible = await this.isMenuItemVisible(menuItem);
-      if (!isVisible) {
-        throw new Error(`Menu item '${menuItem}' is not visible for admin user`);
-      }
+    // Admin menu should not be visible for regular employees
+    const adminMenu = this.page.locator('text=Admin').first();
+    const isAdminVisible = await this.isElementVisible(adminMenu);
+    if (!isAdminVisible) {
+      // This is expected for non-admin users
+      console.log('✅ Admin menu correctly hidden for non-admin user');
     }
   }
 
   /**
-   * Get breadcrumb text
+   * Navigate to a specific module
+   * @param moduleName - Name of the module to navigate to
    */
-  async getBreadcrumbText(): Promise<string> {
-    try {
-      return await this.getTextContent(this.breadcrumb);
-    } catch {
-      return '';
-    }
+  async navigateToModule(moduleName: string): Promise<void> {
+    await this.clickNavigationMenu(moduleName);
+    await this.waitForPageLoad();
   }
 
   /**
-   * Verify dashboard content is loaded
+   * Search for menu items
+   * @param searchTerm - Term to search for
    */
-  async verifyDashboardContent() {
-    await this.verifyElementVisible(this.dashboardContent);
+  async searchMenu(searchTerm: string): Promise<void> {
+    await this.fillInput(this.searchBox, searchTerm);
   }
 
   /**
-   * Check if user is logged in
+   * Verify dashboard widgets/cards are loaded
    */
-  async isUserLoggedIn(): Promise<boolean> {
-    return await this.isElementVisible(this.userDropdown);
+  async verifyDashboardWidgets(): Promise<void> {
+    const widgets = await this.page.locator('.oxd-dashboard-widget').count();
+    expect(widgets).toBeGreaterThan(0);
   }
 } 

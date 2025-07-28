@@ -1,103 +1,103 @@
 import { test, expect } from '@playwright/test';
 import { LoginPage } from '../../pages/LoginPage';
 import { DashboardPage } from '../../pages/DashboardPage';
-import { validCredentials } from '../data/auth-test-data';
+import { AuthTestData } from '../data/auth-test-data';
 
 /**
- * Test Suite: Valid Login Automation
- * Jira Task: HRM-42 - AUTH-001: Implement Valid Login Test Automation
- * Epic: HRM-41 🔐 Authentication & Authorization
+ * AUTH-001: Valid Login Test Automation
+ * Jira Task: HRM-48
+ * 
+ * Test Objective: Verify that users can successfully login with valid credentials
+ * and access the dashboard.
  */
 
-test.describe('Valid Login Tests @auth', () => {
-  let loginPage: LoginPage;
-  let dashboardPage: DashboardPage;
-
+test.describe('AUTH-001: Valid Login Tests', () => {
   test.beforeEach(async ({ page }) => {
-    loginPage = new LoginPage(page);
-    dashboardPage = new DashboardPage(page);
-    
-    // Navigate to login page
+    // Navigate to login page before each test
+    const loginPage = new LoginPage(page);
     await loginPage.navigateToLogin();
-    await loginPage.verifyLoginPageLoaded();
   });
 
-  test('AUTH-001.1: Should successfully login with valid Admin credentials', async ({ page }) => {
-    // Test data
-    const { username, password } = validCredentials;
+  test('should login successfully with valid credentials', async ({ page }) => {
+    // Arrange
+    const loginPage = new LoginPage(page);
+    const dashboardPage = new DashboardPage(page);
+    const { username, password } = AuthTestData.validCredentials;
 
-    try {
-      // Perform login
-      await loginPage.login(username, password);
+    // Act
+    await loginPage.login(username, password);
 
-      // Verify successful login and redirect to dashboard
-      await dashboardPage.verifyDashboardLoaded();
-      
-      // Verify dashboard title
-      const dashboardTitle = await dashboardPage.getDashboardTitle();
-      expect(dashboardTitle).toContain('Dashboard');
-
-      // Verify user is logged in
-      const isLoggedIn = await dashboardPage.isUserLoggedIn();
-      expect(isLoggedIn).toBe(true);
-
-      // Verify URL contains dashboard
-      const currentURL = await page.url();
-      expect(currentURL).toContain('/dashboard');
-
-      console.log('✅ Valid login test passed successfully');
-
-    } catch (error) {
-      await loginPage.takeScreenshot('valid-login-failure');
-      throw error;
-    }
-  });
-
-  test('AUTH-001.2: Should display correct dashboard elements after login', async ({ page }) => {
-    // Login with valid credentials
-    await loginPage.loginAsAdmin();
-
-    // Verify dashboard content is loaded
-    await dashboardPage.verifyDashboardContent();
-
-    // Verify all main navigation elements are present
-    const visibleMenuItems = await dashboardPage.getVisibleMenuItems();
-    expect(visibleMenuItems.length).toBeGreaterThan(0);
-
-    // Verify admin user has access to all modules
-    await dashboardPage.verifyAdminAccess();
-
-    console.log('✅ Dashboard elements verification passed');
-  });
-
-  test('AUTH-001.3: Should maintain session after successful login', async ({ page }) => {
-    // Login with valid credentials
-    await loginPage.loginAsAdmin();
+    // Assert
+    await dashboardPage.verifyDashboardLoaded();
+    await dashboardPage.verifyUserLoggedIn();
+    await dashboardPage.verifyNavigationMenu();
     
-    // Navigate to different modules and verify session is maintained
-    await dashboardPage.navigateToPIM();
-    await page.waitForLoadState('networkidle');
+    // Verify URL change to dashboard
+    await page.waitForURL(/.*dashboard/);
+    expect(page.url()).toContain('dashboard');
     
-    // Verify user is still logged in
-    const isLoggedIn = await dashboardPage.isUserLoggedIn();
-    expect(isLoggedIn).toBe(true);
+    // Verify dashboard elements
+    await dashboardPage.verifyDashboardTitle();
+    await dashboardPage.verifyDashboardWidgets();
+  });
 
+  test('should maintain session after login', async ({ page }) => {
+    // Arrange
+    const loginPage = new LoginPage(page);
+    const dashboardPage = new DashboardPage(page);
+    const { username, password } = AuthTestData.validCredentials;
+
+    // Act - Login and navigate to different modules
+    await loginPage.login(username, password);
+    await dashboardPage.verifyDashboardLoaded();
+    
+    // Navigate to PIM module
+    await dashboardPage.navigateToModule('PIM');
+    await page.waitForURL(/.*pim/);
+    
     // Navigate back to dashboard
-    await page.goto('/web/index.php/dashboard/index');
+    await dashboardPage.navigateToModule('Dashboard');
+
+    // Assert - Session should be maintained
+    await dashboardPage.verifyDashboardLoaded();
+    await dashboardPage.verifyUserLoggedIn();
+  });
+
+  test('should display correct user information after login', async ({ page }) => {
+    // Arrange
+    const loginPage = new LoginPage(page);
+    const dashboardPage = new DashboardPage(page);
+    const { username, password } = AuthTestData.validCredentials;
+
+    // Act
+    await loginPage.login(username, password);
     await dashboardPage.verifyDashboardLoaded();
 
-    console.log('✅ Session maintenance test passed');
+    // Assert
+    await dashboardPage.verifyUserLoggedIn();
+    const currentUser = await dashboardPage.getCurrentUser();
+    
+    // Verify user information is displayed
+    expect(currentUser).toBeTruthy();
+    expect(currentUser.length).toBeGreaterThan(0);
   });
 
-  test.afterEach(async ({ page }) => {
-    // Cleanup: Logout if user is logged in
-    try {
-      const isLoggedIn = await dashboardPage.isUserLoggedIn();
-      if (isLoggedIn) {
-        await dashboardPage.logout();
-      }
-    } catch (error) {
-      console.log('Note: User may not be logged in, skipping logout');
-    }
+  test('should have proper page load performance', async ({ page }) => {
+    // Arrange
+    const loginPage = new LoginPage(page);
+    const dashboardPage = new DashboardPage(page);
+    const { username, password } = AuthTestData.validCredentials;
+
+    // Act - Measure login time
+    const startTime = Date.now();
+    await loginPage.login(username, password);
+    await dashboardPage.verifyDashboardLoaded();
+    const endTime = Date.now();
+
+    // Assert - Login should complete within reasonable time
+    const loginDuration = endTime - startTime;
+    expect(loginDuration).toBeLessThan(AuthTestData.timeouts.loginTimeout);
+    
+    console.log(`✅ Login completed in ${loginDuration}ms`);
   });
 }); 

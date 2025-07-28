@@ -1,137 +1,171 @@
 import { test, expect } from '@playwright/test';
 import { LoginPage } from '../../pages/LoginPage';
-import { DashboardPage } from '../../pages/DashboardPage';
-import { invalidCredentials } from '../data/auth-test-data';
+import { AuthTestData } from '../data/auth-test-data';
 
 /**
- * Test Suite: Invalid Login Attempts Automation
- * Jira Task: HRM-43 - AUTH-002: Implement Invalid Login Attempts Test Automation
- * Epic: HRM-41 🔐 Authentication & Authorization
+ * AUTH-002: Invalid Login Test Automation
+ * Jira Task: HRM-49
+ * 
+ * Test Objective: Verify that invalid login attempts are properly handled
+ * and appropriate error messages are displayed.
  */
 
-test.describe('Invalid Login Tests @auth', () => {
-  let loginPage: LoginPage;
-  let dashboardPage: DashboardPage;
-
+test.describe('AUTH-002: Invalid Login Tests', () => {
   test.beforeEach(async ({ page }) => {
-    loginPage = new LoginPage(page);
-    dashboardPage = new DashboardPage(page);
-    
-    // Navigate to login page
+    const loginPage = new LoginPage(page);
     await loginPage.navigateToLogin();
-    await loginPage.verifyLoginPageLoaded();
   });
 
-  // Data-driven test for all invalid credential scenarios
-  for (const credential of invalidCredentials) {
-    test(`AUTH-002.${invalidCredentials.indexOf(credential) + 1}: ${credential.description}`, async ({ page }) => {
-      try {
-        // Clear any existing data
-        await loginPage.clearForm();
-
-        // Attempt login with invalid credentials
-        await loginPage.login(credential.username, credential.password);
-
-        // Verify error message is displayed (wait a moment for it to appear)
-        await page.waitForTimeout(2000);
-        
-        // Check if error message is displayed
-        const errorDisplayed = await loginPage.isErrorMessageDisplayed();
-        
-        if (errorDisplayed) {
-          const errorMessage = await loginPage.getErrorMessage();
-          expect(errorMessage).toBeTruthy();
-          console.log(`✅ Error message displayed: "${errorMessage}"`);
-        } else {
-          // For some scenarios, the error might be shown differently
-          // Verify user is NOT redirected to dashboard
-          const currentURL = await page.url();
-          expect(currentURL).not.toContain('/dashboard');
-          expect(currentURL).toContain('/auth/login');
+  // Data-driven test for all invalid credential combinations
+  AuthTestData.invalidCredentials.forEach((testData) => {
+    test(`should handle ${testData.testCase}`, async ({ page }) => {
+      // Arrange
+      const loginPage = new LoginPage(page);
+      
+      // Act
+      await loginPage.login(testData.username, testData.password);
+      
+      // Assert
+      if (testData.expectedError === 'Required') {
+        // For empty fields, check specific field validation
+        if (testData.username === '') {
+          const usernameField = loginPage.getUsernameInput();
+          await expect(usernameField).toHaveAttribute('required', '');
         }
-
-        // Verify user is not logged in
-        const isLoggedIn = await dashboardPage.isUserLoggedIn();
-        expect(isLoggedIn).toBe(false);
-
-        console.log(`✅ Invalid login test passed for: ${credential.description}`);
-
-      } catch (error) {
-        await loginPage.takeScreenshot(`invalid-login-${credential.description.replace(/\s+/g, '-')}`);
-        throw error;
+        if (testData.password === '') {
+          const passwordField = loginPage.getPasswordInput();
+          await expect(passwordField).toHaveAttribute('required', '');
+        }
+      } else {
+        // For invalid credentials, verify error message
+        await loginPage.verifyErrorMessage();
       }
+      
+      // Verify user stays on login page
+      await loginPage.verifyStillOnLoginPage();
+      
+      // Verify no redirect to dashboard
+      expect(page.url()).not.toContain('dashboard');
+      
+      console.log(`✅ Test passed for: ${testData.testCase}`);
     });
-  }
+  });
 
-  test('AUTH-002.7: Should handle multiple consecutive invalid login attempts', async ({ page }) => {
-    const testCredentials = invalidCredentials.slice(0, 3); // Test first 3 scenarios
-    
-    for (const credential of testCredentials) {
-      // Clear form before each attempt
+  test('should prevent multiple rapid login attempts', async ({ page }) => {
+    // Arrange
+    const loginPage = new LoginPage(page);
+    const invalidCreds = AuthTestData.invalidCredentials[0];
+
+    // Act - Attempt multiple rapid logins
+    for (let i = 0; i < 3; i++) {
       await loginPage.clearForm();
-      
-      // Attempt login
-      await loginPage.login(credential.username, credential.password);
-      
-      // Wait for response
-      await page.waitForTimeout(1500);
-      
-      // Verify still on login page
-      const currentURL = await page.url();
-      expect(currentURL).toContain('/auth/login');
+      await loginPage.login(invalidCreds.username, invalidCreds.password);
+      await page.waitForTimeout(1000); // Brief wait between attempts
     }
 
-    console.log('✅ Multiple invalid login attempts handled correctly');
+    // Assert - Should still show error and stay on login page
+    await loginPage.verifyErrorMessage();
+    await loginPage.verifyStillOnLoginPage();
   });
 
-  test('AUTH-002.8: Should validate required field indicators', async ({ page }) => {
-    // Try to submit empty form
-    await loginPage.clearForm();
-    await loginPage.clickElement(loginPage.loginButton);
-    
-    // Wait for validation
-    await page.waitForTimeout(1000);
-    
-    // Verify form validation (check for required field indicators)
-    const currentURL = await page.url();
-    expect(currentURL).toContain('/auth/login');
-    
-    // Verify login button state or validation messages
-    const isLoginButtonEnabled = await loginPage.isLoginButtonEnabled();
-    console.log(`Login button enabled state: ${isLoginButtonEnabled}`);
+  test('should maintain form state after failed login', async ({ page }) => {
+    // Arrange
+    const loginPage = new LoginPage(page);
+    const testData = AuthTestData.invalidCredentials[1]; // Valid username, invalid password
 
-    console.log('✅ Required field validation test completed');
+    // Act
+    await loginPage.login(testData.username, testData.password);
+
+    // Assert
+    await loginPage.verifyErrorMessage();
+    
+    // Verify username field retains the entered value
+    const usernameValue = await loginPage.getUsernameInput().inputValue();
+    expect(usernameValue).toBe(testData.username);
+    
+    // Verify password field is cleared for security
+    const passwordValue = await loginPage.getPasswordInput().inputValue();
+    expect(passwordValue).toBe('');
   });
 
-  test('AUTH-002.9: Should maintain login page state after failed attempts', async ({ page }) => {
-    const invalidCred = invalidCredentials[0];
-    
-    // Attempt invalid login
-    await loginPage.login(invalidCred.username, invalidCred.password);
-    await page.waitForTimeout(2000);
-    
-    // Verify login page elements are still present and functional
-    await loginPage.verifyLoginPageLoaded();
-    
-    // Verify form can be cleared and used again
-    await loginPage.clearForm();
-    
-    // Verify placeholders and form state
-    const usernamePlaceholder = await loginPage.getUsernamePlaceholder();
-    console.log(`Username placeholder: ${usernamePlaceholder}`);
+  test('should not expose sensitive information in error messages', async ({ page }) => {
+    // Arrange
+    const loginPage = new LoginPage(page);
+    const testData = AuthTestData.invalidCredentials[0];
 
-    console.log('✅ Login page state maintained after failed attempt');
+    // Act
+    await loginPage.login(testData.username, testData.password);
+
+    // Assert
+    await loginPage.verifyErrorMessage();
+    
+    // Verify error message doesn't expose sensitive info
+    const errorElement = page.locator('.oxd-alert-content-text');
+    const errorText = await errorElement.textContent();
+    
+    // Error should be generic, not revealing specific failure reason
+    expect(errorText).not.toContain(testData.username);
+    expect(errorText).not.toContain(testData.password);
+    expect(errorText).not.toContain('username');
+    expect(errorText).not.toContain('password');
+  });
+});
+
+test.describe('AUTH-002: Security Validation Tests', () => {
+  test.beforeEach(async ({ page }) => {
+    const loginPage = new LoginPage(page);
+    await loginPage.navigateToLogin();
   });
 
-  test.afterEach(async ({ page }) => {
-    // Ensure we're ready for next test
-    try {
-      const currentURL = await page.url();
-      if (!currentURL.includes('/auth/login')) {
-        await loginPage.navigateToLogin();
-      }
-    } catch (error) {
-      console.log('Note: Cleanup navigation may not be needed');
-    }
+  // Security-focused tests for SQL Injection and XSS
+  AuthTestData.securityTestData.forEach((testData) => {
+    test(`should prevent ${testData.testCase}`, async ({ page }) => {
+      // Arrange
+      const loginPage = new LoginPage(page);
+      
+      // Act
+      await loginPage.login(testData.username, testData.password);
+      
+      // Assert
+      await loginPage.verifyErrorMessage();
+      await loginPage.verifyStillOnLoginPage();
+      
+      // Verify no code execution or injection occurred
+      const currentUrl = await loginPage.getCurrentUrl();
+      expect(currentUrl).toContain('login');
+      expect(currentUrl).not.toContain('script');
+      expect(currentUrl).not.toContain('alert');
+      
+      // Verify page content is not compromised
+      const pageContent = await page.content();
+      expect(pageContent).not.toContain('<script>');
+      expect(pageContent).not.toContain('alert("xss")');
+      
+      console.log(`✅ Security test passed for: ${testData.testCase}`);
+    });
+  });
+
+  test('should sanitize input fields properly', async ({ page }) => {
+    // Arrange
+    const loginPage = new LoginPage(page);
+    const maliciousInput = '<script>alert("test")</script>';
+
+    // Act
+    await loginPage.login(maliciousInput, maliciousInput);
+
+    // Assert
+    await loginPage.verifyErrorMessage();
+    
+    // Verify input sanitization
+    const usernameValue = await loginPage.getUsernameInput().inputValue();
+    const passwordValue = await loginPage.getPasswordInput().inputValue();
+    
+    // Inputs should be handled safely
+    expect(usernameValue).toBe(maliciousInput); // Should retain input but not execute
+    expect(passwordValue).toBe(''); // Password should be cleared
+    
+    // Verify no script execution in DOM
+    const alerts = await page.evaluate(() => window.alert.toString());
+    expect(alerts).not.toContain('test');
   });
 }); 

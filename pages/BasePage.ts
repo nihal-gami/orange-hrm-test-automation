@@ -1,63 +1,67 @@
 import { Page, Locator, expect } from '@playwright/test';
 
-export class BasePage {
-  readonly page: Page;
-  readonly baseURL: string;
+export abstract class BasePage {
+  protected page: Page;
+  protected baseURL: string;
 
   constructor(page: Page) {
     this.page = page;
-    this.baseURL = 'https://opensource-demo.orangehrmlive.com';
+    this.baseURL = 'https://opensource-demo.orangehrmlive.com/';
   }
 
   /**
    * Navigate to a specific URL
    * @param url - The URL to navigate to
    */
-  async goto(url: string = '') {
-    await this.page.goto(`${this.baseURL}${url}`);
+  async navigate(url: string = ''): Promise<void> {
+    const fullUrl = url.startsWith('http') ? url : `${this.baseURL}${url}`;
+    await this.page.goto(fullUrl, { waitUntil: 'networkidle' });
   }
 
   /**
-   * Wait for page to load completely
+   * Wait for an element to be visible
+   * @param locator - The element locator
+   * @param timeout - Optional timeout in milliseconds
    */
-  async waitForPageLoad() {
-    await this.page.waitForLoadState('networkidle');
-  }
-
-  /**
-   * Take a screenshot
-   * @param name - Screenshot name
-   */
-  async takeScreenshot(name: string) {
-    await this.page.screenshot({ path: `test-results/screenshots/${name}.png` });
-  }
-
-  /**
-   * Get page title
-   */
-  async getTitle(): Promise<string> {
-    return await this.page.title();
-  }
-
-  /**
-   * Get current URL
-   */
-  async getCurrentURL(): Promise<string> {
-    return this.page.url();
-  }
-
-  /**
-   * Wait for element to be visible
-   * @param locator - Element locator
-   * @param timeout - Timeout in milliseconds
-   */
-  async waitForElement(locator: Locator, timeout: number = 15000) {
+  async waitForElement(locator: Locator, timeout: number = 10000): Promise<void> {
     await locator.waitFor({ state: 'visible', timeout });
   }
 
   /**
+   * Click an element with retry mechanism
+   * @param locator - The element locator
+   */
+  async clickElement(locator: Locator): Promise<void> {
+    await this.waitForElement(locator);
+    await locator.click();
+  }
+
+  /**
+   * Fill input field with retry mechanism
+   * @param locator - The input field locator
+   * @param text - Text to fill
+   */
+  async fillInput(locator: Locator, text: string): Promise<void> {
+    await this.waitForElement(locator);
+    await locator.clear();
+    await locator.fill(text);
+  }
+
+  /**
+   * Get text content of an element
+   * @param locator - The element locator
+   * @returns Promise<string>
+   */
+  async getTextContent(locator: Locator): Promise<string> {
+    await this.waitForElement(locator);
+    const text = await locator.textContent();
+    return text || '';
+  }
+
+  /**
    * Check if element is visible
-   * @param locator - Element locator
+   * @param locator - The element locator
+   * @returns Promise<boolean>
    */
   async isElementVisible(locator: Locator): Promise<boolean> {
     try {
@@ -69,60 +73,33 @@ export class BasePage {
   }
 
   /**
-   * Click element with retry mechanism
-   * @param locator - Element locator
-   * @param timeout - Timeout in milliseconds
+   * Verify page title
+   * @param expectedTitle - Expected page title
    */
-  async clickElement(locator: Locator, timeout: number = 15000) {
-    await locator.waitFor({ state: 'visible', timeout });
-    await locator.click();
+  async verifyPageTitle(expectedTitle: string): Promise<void> {
+    await expect(this.page).toHaveTitle(expectedTitle);
   }
 
   /**
-   * Fill text input with validation
-   * @param locator - Input element locator
-   * @param text - Text to fill
-   * @param clear - Whether to clear the field first
+   * Verify URL contains expected text
+   * @param expectedUrlPart - Expected URL part
    */
-  async fillText(locator: Locator, text: string, clear: boolean = true) {
-    await locator.waitFor({ state: 'visible' });
-    if (clear) {
-      await locator.clear();
-    }
-    await locator.fill(text);
+  async verifyUrl(expectedUrlPart: string): Promise<void> {
+    await expect(this.page).toHaveURL(new RegExp(expectedUrlPart));
   }
 
   /**
-   * Get text content from element
-   * @param locator - Element locator
+   * Take screenshot for debugging
+   * @param name - Screenshot name
    */
-  async getTextContent(locator: Locator): Promise<string> {
-    await locator.waitFor({ state: 'visible' });
-    return await locator.textContent() || '';
+  async takeScreenshot(name: string): Promise<void> {
+    await this.page.screenshot({ path: `test-results/screenshots/${name}.png`, fullPage: true });
   }
 
   /**
-   * Verify element contains expected text
-   * @param locator - Element locator
-   * @param expectedText - Expected text content
+   * Wait for page to load completely
    */
-  async verifyElementText(locator: Locator, expectedText: string) {
-    await expect(locator).toContainText(expectedText);
-  }
-
-  /**
-   * Verify element is visible
-   * @param locator - Element locator
-   */
-  async verifyElementVisible(locator: Locator) {
-    await expect(locator).toBeVisible();
-  }
-
-  /**
-   * Verify element is hidden
-   * @param locator - Element locator
-   */
-  async verifyElementHidden(locator: Locator) {
-    await expect(locator).toBeHidden();
+  async waitForPageLoad(): Promise<void> {
+    await this.page.waitForLoadState('networkidle');
   }
 } 
