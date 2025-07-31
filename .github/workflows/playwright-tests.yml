@@ -1,0 +1,267 @@
+name: 🧪 Playwright Test Automation
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch: # Allow manual triggering
+  schedule:
+    # Run tests daily at 2 AM UTC for regression testing
+    - cron: '0 2 * * *'
+
+env:
+  # Environment variables for consistent test execution
+  NODE_VERSION: '18'
+  PLAYWRIGHT_BROWSERS_PATH: 0
+
+jobs:
+  test:
+    name: 🚀 Run E2E Tests
+    runs-on: ubuntu-latest
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        # Following automation rules: Single browser (Chrome) execution
+        browser: [chromium]
+    
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          
+      - name: 📦 Install dependencies
+        run: |
+          npm ci
+          
+      - name: 🌐 Install Playwright browsers
+        run: |
+          # Install only Chrome as per automation rules
+          npx playwright install chromium
+          npx playwright install-deps chromium
+          
+      - name: 🔍 Validate environment
+        run: |
+          echo "Node version: $(node --version)"
+          echo "NPM version: $(npm --version)"
+          echo "Playwright version: $(npx playwright --version)"
+          
+      - name: 🧪 Run Playwright tests
+        run: |
+          # Run with 1 worker on CI for resource control and stability
+          npx playwright test --workers=1 --reporter=html,json,junit
+        env:
+          # CI environment variables
+          CI: true
+          PLAYWRIGHT_HTML_REPORT: playwright-report
+          
+      - name: 📊 Upload test results
+        uses: actions/upload-artifact@v4
+        if: always() # Upload even if tests fail
+        with:
+          name: playwright-test-results-${{ matrix.browser }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 30
+          
+      - name: 📈 Upload test reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-reports-${{ matrix.browser }}
+          path: |
+            test-results/results.json
+            test-results/results.xml
+          retention-days: 30
+          
+      - name: 🖼️ Upload screenshots and videos
+        uses: actions/upload-artifact@v4
+        if: failure() # Only upload on test failures
+        with:
+          name: test-artifacts-${{ matrix.browser }}
+          path: |
+            test-results/screenshots/
+            test-results/videos/
+            test-results/traces/
+          retention-days: 7
+          
+      - name: 📋 Publish test results
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: 🧪 Playwright Test Results (${{ matrix.browser }})
+          path: test-results/results.xml
+          reporter: java-junit
+          fail-on-error: false
+          
+      - name: 💬 Comment test results on PR
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request' && always()
+        with:
+          script: |
+            const fs = require('fs');
+            
+            // Read test results
+            let testResults = '';
+            try {
+              const resultsPath = 'test-results/results.json';
+              if (fs.existsSync(resultsPath)) {
+                const results = JSON.parse(fs.readFileSync(resultsPath, 'utf8'));
+                const stats = results.stats;
+                const passRate = ((stats.passed / (stats.passed + stats.failed)) * 100).toFixed(1);
+                
+                testResults = `
+            ## 🧪 Test Execution Results
+            
+            | Metric | Value |
+            |--------|-------|
+            | **Total Tests** | ${stats.passed + stats.failed + stats.skipped} |
+            | **✅ Passed** | ${stats.passed} |
+            | **❌ Failed** | ${stats.failed} |
+            | **⏭️ Skipped** | ${stats.skipped} |
+            | **📊 Pass Rate** | ${passRate}% |
+            | **⏱️ Duration** | ${Math.round(results.config.globalTimeout / 1000)}s timeout |
+            | **🌐 Browser** | Chrome (${process.env.GITHUB_RUN_NUMBER}) |
+            | **👥 Workers** | 1 (CI optimized) |
+            
+            ${stats.failed > 0 ? '🔍 **Failed tests artifacts are available in the Actions artifacts.**' : '🎉 **All tests passed successfully!**'}
+            
+            ---
+            *Automated test execution via GitHub Actions*
+                `;
+              } else {
+                testResults = '⚠️ Test results file not found. Check the test execution logs.';
+              }
+            } catch (error) {
+              testResults = `❌ Error reading test results: ${error.message}`;
+            }
+            
+            // Comment on PR
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: testResults
+            });
+
+  security-scan:
+    name: 🔒 Security Scan
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          
+      - name: 📦 Install dependencies
+        run: npm ci
+        
+      - name: 🛡️ Run security audit
+        run: |
+          npm audit --audit-level=moderate
+          
+      - name: 🔍 Check for sensitive data
+        run: |
+          # Check for potential secrets or sensitive data
+          echo "🔍 Scanning for potential secrets..."
+          if grep -r -i "password\|secret\|key\|token" --include="*.ts" --include="*.js" --exclude-dir=node_modules .; then
+            echo "⚠️ Potential sensitive data found. Please review."
+            exit 1
+          else
+            echo "✅ No obvious sensitive data found."
+          fi
+
+  deploy-reports:
+    name: 📊 Deploy Test Reports
+    runs-on: ubuntu-latest
+    needs: test
+    if: always() && github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: 📊 Download test reports
+        uses: actions/download-artifact@v4
+        with:
+          name: playwright-test-results-chromium
+          path: reports/
+          
+      - name: 🚀 Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: reports/playwright-report
+          destination_dir: latest-report
+          
+      - name: 💬 Comment report link
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const reportUrl = `https://${context.repo.owner}.github.io/${context.repo.repo}/latest-report/`;
+            
+            github.rest.repos.createCommitComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: context.sha,
+              body: `📊 **Test Report Published**: ${reportUrl}\n\n🔗 View detailed test results, screenshots, and traces.`
+            });
+
+  notification:
+    name: 📧 Notifications
+    runs-on: ubuntu-latest
+    needs: [test, security-scan]
+    if: always() && (needs.test.result == 'failure' || needs.security-scan.result == 'failure')
+    
+    steps:
+      - name: 📧 Notify on test failure
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const testStatus = '${{ needs.test.result }}';
+            const securityStatus = '${{ needs.security-scan.result }}';
+            
+            let message = '🚨 **Test Automation Alert**\n\n';
+            
+            if (testStatus === 'failure') {
+              message += '❌ **Test Execution Failed**: Some tests are failing.\n';
+            }
+            
+            if (securityStatus === 'failure') {
+              message += '🔒 **Security Scan Failed**: Security issues detected.\n';
+            }
+            
+            message += `\n📝 **Details**: Check the [workflow run](${context.payload.repository.html_url}/actions/runs/${context.runId}) for more information.`;
+            message += `\n🔗 **Commit**: ${context.sha.substring(0, 7)}`;
+            message += `\n👤 **Triggered by**: ${context.actor}`;
+            
+            // Create issue for failed tests (if not exists)
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'test-failure'
+            });
+            
+            if (issues.data.length === 0) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `🧪 Test Automation Alert - ${new Date().toISOString().split('T')[0]}`,
+                body: message,
+                labels: ['test-failure', 'automation', 'bug']
+              });
+            } 
