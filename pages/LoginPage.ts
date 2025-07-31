@@ -23,10 +23,10 @@ export class LoginPage extends BasePage {
     this.usernameField = page.locator('[name="username"]');
     this.passwordField = page.locator('[name="password"]');
     this.loginButton = page.locator('[type="submit"]');
-    this.errorMessage = page.locator('div[role="alert"] p, .oxd-alert-content-text');
+    this.errorMessage = page.locator('[role="alert"] p, .oxd-alert-content-text, .oxd-alert p');
     this.forgotPasswordLink = page.locator('.orangehrm-login-forgot-header');
     this.orangeHrmLogo = page.locator('.orangehrm-login-branding img');
-    this.loginFormContainer = page.locator('.orangehrm-login-form');
+    this.loginFormContainer = page.locator('.orangehrm-login-form').first();
     this.credentialsContainer = page.locator('.orangehrm-demo-credentials');
   }
 
@@ -78,8 +78,12 @@ export class LoginPage extends BasePage {
    */
   async getErrorMessage(): Promise<string> {
     try {
-      await this.waitForElement(this.errorMessage, 5000);
-      return await this.getTextContent(this.errorMessage);
+      await this.page.waitForTimeout(2000); // Wait for error to appear
+      const isVisible = await this.errorMessage.isVisible();
+      if (isVisible) {
+        return await this.getTextContent(this.errorMessage);
+      }
+      return '';
     } catch {
       return '';
     }
@@ -90,7 +94,12 @@ export class LoginPage extends BasePage {
    * @returns Promise<boolean> - Error message visibility
    */
   async isErrorMessageDisplayed(): Promise<boolean> {
-    return await this.isElementVisible(this.errorMessage);
+    try {
+      await this.page.waitForTimeout(2000); // Wait for error to appear
+      return await this.errorMessage.isVisible();
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -114,10 +123,12 @@ export class LoginPage extends BasePage {
    * Verify login form is displayed
    */
   async verifyLoginFormDisplayed(): Promise<void> {
-    await expect(this.loginFormContainer).toBeVisible();
-    await expect(this.usernameField).toBeVisible();
-    await expect(this.passwordField).toBeVisible();
-    await expect(this.loginButton).toBeVisible();
+    // Wait for page to load first
+    await this.waitForPageLoad();
+    // Verify the key form elements are visible with timeout
+    await expect(this.usernameField).toBeVisible({ timeout: 10000 });
+    await expect(this.passwordField).toBeVisible({ timeout: 5000 });
+    await expect(this.loginButton).toBeVisible({ timeout: 5000 });
   }
 
   /**

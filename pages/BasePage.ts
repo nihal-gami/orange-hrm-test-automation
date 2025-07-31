@@ -102,7 +102,16 @@ export class BasePage {
    * Wait for page to load completely
    */
   async waitForPageLoad(): Promise<void> {
-    await this.page.waitForLoadState('networkidle');
+    await this.page.waitForLoadState('domcontentloaded');
+    // Use a more lenient approach for parallel execution
+    try {
+      await this.page.waitForLoadState('networkidle', { timeout: 8000 });
+    } catch (error) {
+      // Check if page is still available before fallback timeout
+      if (!this.page.isClosed()) {
+        await this.page.waitForTimeout(1500);
+      }
+    }
   }
 
   /**

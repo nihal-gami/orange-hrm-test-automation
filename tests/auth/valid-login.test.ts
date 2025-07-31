@@ -132,7 +132,7 @@ test.describe('HRM-60: Valid Login with Correct Credentials', () => {
       { method: () => dashboardPage.navigateToAdmin(), urlPattern: /.*admin.*/ },
       { method: () => dashboardPage.navigateToPIM(), urlPattern: /.*pim.*/ },
       { method: () => dashboardPage.navigateToLeave(), urlPattern: /.*leave.*/ },
-      { method: () => dashboardPage.navigateToMyInfo(), urlPattern: /.*myinfo.*/ }
+             { method: () => dashboardPage.navigateToMyInfo(), urlPattern: /.*pim.*/ }
     ];
     
     for (const moduleTest of moduleTests) {

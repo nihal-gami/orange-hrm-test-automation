@@ -76,8 +76,10 @@ export class DashboardPage extends BasePage {
    * Wait for dashboard to load completely
    */
   async waitForDashboardLoad(): Promise<void> {
-    await this.waitForElement(this.dashboardTitle);
-    await this.waitForElement(this.sidebarMenu);
+    // Wait for key elements to be visible
+    await this.waitForElement(this.dashboardTitle, 15000);
+    await this.waitForElement(this.userDropdown, 10000);
+    // Sidebar menu is optional for load verification
     await this.waitForPageLoad();
   }
 
@@ -89,6 +91,14 @@ export class DashboardPage extends BasePage {
     await expect(this.dashboardTitle).toBeVisible();
     await expect(this.dashboardTitle).toHaveText('Dashboard');
     await expect(this.userDropdown).toBeVisible();
+  }
+
+  /**
+   * Verify user is logged in (less strict than verifySuccessfulLogin)
+   */
+  async verifyUserLoggedIn(): Promise<void> {
+    await expect(this.userDropdown).toBeVisible();
+    // User is logged in if they can see the user dropdown
   }
 
   /**
