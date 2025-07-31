@@ -11,7 +11,10 @@
     "test:report": "npx playwright show-report",
     "test:chrome": "npx playwright test --project=chromium",
     "test:auth": "npx playwright test tests/auth/ --project=chromium",
-    "install:browsers": "npx playwright install chromium"
+    "test:local": "npx playwright test --workers=2",
+    "test:ci": "npx playwright test --workers=1 --reporter=html,json,junit",
+    "install:browsers": "npx playwright install chromium",
+    "pretest": "npm run install:browsers"
   },
   "keywords": [
     "playwright",
