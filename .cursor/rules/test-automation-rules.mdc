@@ -14,12 +14,6 @@ alwaysApply: true
 - Implement **robust error handling** using `try-catch` blocks and **dynamic waits** (e.g., Playwright’s `waitForSelector`, `expect` assertions with timeouts).
 - Avoid hardcoded waits like `sleep`; prefer built-in wait mechanisms for stability.
 
-## 🔐 Security Awareness
-- Include tests that validate basic **security vulnerabilities**, such as:
-  - **SQL Injection**
-  - **Cross-Site Scripting (XSS)**
-- Validate form inputs and use test cases that simulate user manipulation attempts.
-
 ## 🌐 Browser Consistency
 - All automation tests must be executed in a **single browser: Chrome**.
 - **Do not implement cross-browser testing** unless explicitly approved by the team or required by the Jira ticket.

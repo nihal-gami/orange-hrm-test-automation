@@ -1,16 +1,17 @@
 {
-  "name": "orange-hrm-automation-suite",
+  "name": "orange-hrm-test-automation",
   "version": "1.0.0",
-  "description": "Automated test suite for Orange HRM Demo application using Playwright",
+  "description": "Playwright test automation suite for Orange HRM Demo application",
   "main": "index.js",
   "scripts": {
-    "test": "playwright test",
-    "test:headed": "playwright test --headed",
-    "test:debug": "playwright test --debug",
-    "test:ui": "playwright test --ui",
-    "test:auth": "playwright test tests/auth/",
-    "report": "playwright show-report",
-    "install-browsers": "playwright install"
+    "test": "npx playwright test",
+    "test:headed": "npx playwright test --headed",
+    "test:debug": "npx playwright test --debug",
+    "test:ui": "npx playwright test --ui",
+    "test:report": "npx playwright show-report",
+    "test:chrome": "npx playwright test --project=chromium",
+    "test:auth": "npx playwright test tests/auth/ --project=chromium",
+    "install:browsers": "npx playwright install chromium"
   },
   "keywords": [
     "playwright",
@@ -19,14 +20,14 @@
     "orange-hrm",
     "e2e"
   ],
-  "author": "Test Automation Team",
+  "author": "Nihal Gami",
   "license": "MIT",
   "devDependencies": {
     "@playwright/test": "^1.40.0",
-    "@types/node": "^20.0.0",
-    "typescript": "^5.0.0"
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0"
   },
   "dependencies": {
-    "dotenv": "^16.3.1"
+    "dotenv": "^16.3.0"
   }
 } 

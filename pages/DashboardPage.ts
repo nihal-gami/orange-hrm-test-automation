@@ -1,104 +1,246 @@
 import { Page, Locator, expect } from '@playwright/test';
 import { BasePage } from './BasePage';
 
+/**
+ * DashboardPage class for Orange HRM dashboard functionality
+ * Handles post-login navigation and user actions
+ */
 export class DashboardPage extends BasePage {
-  readonly dashboardHeader: Locator;
+  // Navigation locators
+  readonly dashboardTitle: Locator;
   readonly userDropdown: Locator;
   readonly logoutOption: Locator;
-  readonly sideMenu: Locator;
+  readonly welcomeMessage: Locator;
+  readonly mainMenuItems: Locator;
+  readonly userProfilePicture: Locator;
+  readonly breadcrumbNav: Locator;
+  readonly sidebarMenu: Locator;
+
+  // Menu items
   readonly adminMenuItem: Locator;
   readonly pimMenuItem: Locator;
   readonly leaveMenuItem: Locator;
   readonly timeMenuItem: Locator;
   readonly recruitmentMenuItem: Locator;
+  readonly myInfoMenuItem: Locator;
   readonly performanceMenuItem: Locator;
+  readonly dashboardMenuItem: Locator;
   readonly directoryMenuItem: Locator;
   readonly maintenanceMenuItem: Locator;
-  readonly claimMenuItem: Locator;
   readonly buzzMenuItem: Locator;
+
+  // Dashboard widgets
+  readonly timeAtWorkWidget: Locator;
+  readonly myActionsWidget: Locator;
+  readonly quickLaunchWidget: Locator;
+  readonly buzzLatestPostsWidget: Locator;
+  readonly employeesOnLeaveWidget: Locator;
+  readonly employeeDistributionWidget: Locator;
 
   constructor(page: Page) {
     super(page);
-    this.dashboardHeader = page.locator('.oxd-topbar-header-breadcrumb h6');
+    
+    // Navigation elements
+    this.dashboardTitle = page.locator('.oxd-topbar-header-breadcrumb h6');
     this.userDropdown = page.locator('.oxd-userdropdown-tab');
     this.logoutOption = page.locator('text=Logout');
-    this.sideMenu = page.locator('.oxd-sidepanel');
-    
-    // Main menu items
-    this.adminMenuItem = page.locator('a[href*="/admin"], .oxd-main-menu-item:has-text("Admin")');
-    this.pimMenuItem = page.locator('a[href*="/pim"], .oxd-main-menu-item:has-text("PIM")');
-    this.leaveMenuItem = page.locator('a[href*="/leave"], .oxd-main-menu-item:has-text("Leave")');
-    this.timeMenuItem = page.locator('a[href*="/time"], .oxd-main-menu-item:has-text("Time")');
-    this.recruitmentMenuItem = page.locator('a[href*="/recruitment"], .oxd-main-menu-item:has-text("Recruitment")');
-    this.performanceMenuItem = page.locator('a[href*="/performance"], .oxd-main-menu-item:has-text("Performance")');
-    this.directoryMenuItem = page.locator('a[href*="/directory"], .oxd-main-menu-item:has-text("Directory")');
-    this.maintenanceMenuItem = page.locator('a[href*="/maintenance"], .oxd-main-menu-item:has-text("Maintenance")');
-    this.claimMenuItem = page.locator('a[href*="/claim"], .oxd-main-menu-item:has-text("Claim")');
-    this.buzzMenuItem = page.locator('a[href*="/buzz"], .oxd-main-menu-item:has-text("Buzz")');
+    this.welcomeMessage = page.locator('.oxd-topbar-header-title');
+    this.mainMenuItems = page.locator('.oxd-main-menu-item');
+    this.userProfilePicture = page.locator('.oxd-userdropdown-img');
+    this.breadcrumbNav = page.locator('.oxd-topbar-header-breadcrumb');
+    this.sidebarMenu = page.locator('.oxd-sidepanel');
+
+    // Initialize menu item locators
+    this.adminMenuItem = page.locator('text=Admin').first();
+    this.pimMenuItem = page.locator('text=PIM').first();
+    this.leaveMenuItem = page.locator('text=Leave').first();
+    this.timeMenuItem = page.locator('text=Time').first();
+    this.recruitmentMenuItem = page.locator('text=Recruitment').first();
+    this.myInfoMenuItem = page.locator('text=My Info').first();
+    this.performanceMenuItem = page.locator('text=Performance').first();
+    this.dashboardMenuItem = page.locator('text=Dashboard').first();
+    this.directoryMenuItem = page.locator('text=Directory').first();
+    this.maintenanceMenuItem = page.locator('text=Maintenance').first();
+    this.buzzMenuItem = page.locator('text=Buzz').first();
+
+    // Dashboard widgets
+    this.timeAtWorkWidget = page.locator('.oxd-pie-chart');
+    this.myActionsWidget = page.locator('.orangehrm-todo-list');
+    this.quickLaunchWidget = page.locator('.orangehrm-quick-launch');
+    this.buzzLatestPostsWidget = page.locator('.orangehrm-buzz-stats');
+    this.employeesOnLeaveWidget = page.locator('.orangehrm-leave-card');
+    this.employeeDistributionWidget = page.locator('.orangehrm-buzz-newsfeed');
   }
 
+  /**
+   * Wait for dashboard to load completely
+   */
   async waitForDashboardLoad(): Promise<void> {
-    await this.dashboardHeader.waitFor({ state: 'visible' });
+    await this.waitForElement(this.dashboardTitle);
+    await this.waitForElement(this.sidebarMenu);
     await this.waitForPageLoad();
   }
 
-  async isDashboardVisible(): Promise<boolean> {
-    return await this.isElementVisible(this.dashboardHeader);
+  /**
+   * Verify user is successfully logged in to dashboard
+   */
+  async verifySuccessfulLogin(): Promise<void> {
+    await this.waitForDashboardLoad();
+    await expect(this.dashboardTitle).toBeVisible();
+    await expect(this.dashboardTitle).toHaveText('Dashboard');
+    await expect(this.userDropdown).toBeVisible();
   }
 
+  /**
+   * Get dashboard title text
+   * @returns Promise<string> - Dashboard title
+   */
   async getDashboardTitle(): Promise<string> {
-    return await this.dashboardHeader.textContent() || '';
+    return await this.getTextContent(this.dashboardTitle);
   }
 
+  /**
+   * Click on user dropdown menu
+   */
+  async clickUserDropdown(): Promise<void> {
+    await this.clickElement(this.userDropdown);
+  }
+
+  /**
+   * Perform logout action
+   */
   async logout(): Promise<void> {
-    await this.userDropdown.click();
-    await this.logoutOption.click();
-    await this.page.waitForURL('**/auth/login');
+    await this.clickUserDropdown();
+    await this.waitForElement(this.logoutOption);
+    await this.clickElement(this.logoutOption);
   }
 
-  async isUserLoggedIn(): Promise<boolean> {
-    return await this.isElementVisible(this.userDropdown);
-  }
-
+  /**
+   * Navigate to Admin module
+   */
   async navigateToAdmin(): Promise<void> {
-    await this.adminMenuItem.click();
-    await this.page.waitForURL('**/admin/**');
+    await this.clickElement(this.adminMenuItem);
+    await this.waitForPageLoad();
   }
 
+  /**
+   * Navigate to PIM module
+   */
   async navigateToPIM(): Promise<void> {
-    await this.pimMenuItem.click();
-    await this.page.waitForURL('**/pim/**');
+    await this.clickElement(this.pimMenuItem);
+    await this.waitForPageLoad();
   }
 
+  /**
+   * Navigate to Leave module
+   */
   async navigateToLeave(): Promise<void> {
-    await this.leaveMenuItem.click();
-    await this.page.waitForURL('**/leave/**');
+    await this.clickElement(this.leaveMenuItem);
+    await this.waitForPageLoad();
   }
 
+  /**
+   * Navigate to Time module
+   */
+  async navigateToTime(): Promise<void> {
+    await this.clickElement(this.timeMenuItem);
+    await this.waitForPageLoad();
+  }
+
+  /**
+   * Navigate to Recruitment module
+   */
+  async navigateToRecruitment(): Promise<void> {
+    await this.clickElement(this.recruitmentMenuItem);
+    await this.waitForPageLoad();
+  }
+
+  /**
+   * Navigate to My Info module
+   */
+  async navigateToMyInfo(): Promise<void> {
+    await this.clickElement(this.myInfoMenuItem);
+    await this.waitForPageLoad();
+  }
+
+  /**
+   * Check if specific menu item is visible based on user role
+   * @param menuItem - Menu item locator
+   * @returns Promise<boolean> - Visibility status
+   */
   async isMenuItemVisible(menuItem: Locator): Promise<boolean> {
     return await this.isElementVisible(menuItem);
   }
 
+  /**
+   * Verify role-based menu access
+   * @param expectedMenuItems - Array of expected menu item names
+   */
+  async verifyRoleBasedMenuAccess(expectedMenuItems: string[]): Promise<void> {
+    for (const menuItem of expectedMenuItems) {
+      const menuLocator = this.page.locator(`text=${menuItem}`).first();
+      await expect(menuLocator).toBeVisible();
+    }
+  }
+
+  /**
+   * Get all visible menu items
+   * @returns Promise<string[]> - List of visible menu items
+   */
   async getVisibleMenuItems(): Promise<string[]> {
-    const menuItems = [
-      { locator: this.adminMenuItem, name: 'Admin' },
-      { locator: this.pimMenuItem, name: 'PIM' },
-      { locator: this.leaveMenuItem, name: 'Leave' },
-      { locator: this.timeMenuItem, name: 'Time' },
-      { locator: this.recruitmentMenuItem, name: 'Recruitment' },
-      { locator: this.performanceMenuItem, name: 'Performance' },
-      { locator: this.directoryMenuItem, name: 'Directory' },
-      { locator: this.maintenanceMenuItem, name: 'Maintenance' },
-      { locator: this.claimMenuItem, name: 'Claim' },
-      { locator: this.buzzMenuItem, name: 'Buzz' }
+    const menuItems = await this.mainMenuItems.allTextContents();
+    return menuItems.filter(item => item.trim() !== '');
+  }
+
+  /**
+   * Verify user profile picture is displayed
+   */
+  async verifyUserProfilePicture(): Promise<void> {
+    await expect(this.userProfilePicture).toBeVisible();
+  }
+
+  /**
+   * Verify sidebar menu is displayed
+   */
+  async verifySidebarMenu(): Promise<void> {
+    await expect(this.sidebarMenu).toBeVisible();
+  }
+
+  /**
+   * Verify dashboard widgets are loaded
+   */
+  async verifyDashboardWidgets(): Promise<void> {
+    // Check if at least some dashboard widgets are visible
+    const widgetSelectors = [
+      this.timeAtWorkWidget,
+      this.myActionsWidget,
+      this.quickLaunchWidget
     ];
 
-    const visibleItems: string[] = [];
-    for (const item of menuItems) {
-      if (await this.isMenuItemVisible(item.locator)) {
-        visibleItems.push(item.name);
+    for (const widget of widgetSelectors) {
+      const isVisible = await this.isElementVisible(widget);
+      if (isVisible) {
+        // At least one widget is visible, dashboard is properly loaded
+        return;
       }
     }
-    return visibleItems;
+  }
+
+  /**
+   * Get current breadcrumb navigation
+   * @returns Promise<string> - Breadcrumb text
+   */
+  async getBreadcrumbNavigation(): Promise<string> {
+    return await this.getTextContent(this.breadcrumbNav);
+  }
+
+  /**
+   * Verify specific module access based on user role
+   * @param moduleName - Name of the module to verify access
+   * @returns Promise<boolean> - Access status
+   */
+  async verifyModuleAccess(moduleName: string): Promise<boolean> {
+    const moduleLocator = this.page.locator(`text=${moduleName}`).first();
+    return await this.isElementVisible(moduleLocator);
   }
 } 

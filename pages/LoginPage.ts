@@ -1,131 +1,189 @@
 import { Page, Locator, expect } from '@playwright/test';
 import { BasePage } from './BasePage';
 
+/**
+ * LoginPage class for Orange HRM login functionality
+ * Implements Page Object Model pattern for maintainable test code
+ */
 export class LoginPage extends BasePage {
-  readonly usernameInput: Locator;
-  readonly passwordInput: Locator;
+  // Page locators
+  readonly usernameField: Locator;
+  readonly passwordField: Locator;
   readonly loginButton: Locator;
   readonly errorMessage: Locator;
-  readonly requiredFieldError: Locator;
-  readonly usernameRequiredError: Locator;
-  readonly passwordRequiredError: Locator;
   readonly forgotPasswordLink: Locator;
-  readonly loginCard: Locator;
-  readonly companyBranding: Locator;
+  readonly orangeHrmLogo: Locator;
+  readonly loginFormContainer: Locator;
+  readonly credentialsContainer: Locator;
 
   constructor(page: Page) {
     super(page);
-    this.usernameInput = page.locator('input[name="username"]');
-    this.passwordInput = page.locator('input[name="password"]');
-    this.loginButton = page.locator('button[type="submit"]');
-    this.errorMessage = page.locator('.oxd-alert-content-text, div[role="alert"] p');
-    this.requiredFieldError = page.locator('.oxd-text--span:has-text("Required"), span:has-text("Required")');
-    this.usernameRequiredError = page.locator('input[name="username"] ~ .oxd-text--span:has-text("Required")');
-    this.passwordRequiredError = page.locator('input[name="password"] ~ .oxd-text--span:has-text("Required")');
+    
+    // Initialize locators
+    this.usernameField = page.locator('[name="username"]');
+    this.passwordField = page.locator('[name="password"]');
+    this.loginButton = page.locator('[type="submit"]');
+    this.errorMessage = page.locator('div[role="alert"] p, .oxd-alert-content-text');
     this.forgotPasswordLink = page.locator('.orangehrm-login-forgot-header');
-    this.loginCard = page.locator('.orangehrm-login-container');
-    this.companyBranding = page.locator('.orangehrm-login-branding');
+    this.orangeHrmLogo = page.locator('.orangehrm-login-branding img');
+    this.loginFormContainer = page.locator('.orangehrm-login-form');
+    this.credentialsContainer = page.locator('.orangehrm-demo-credentials');
   }
 
+  /**
+   * Navigate to login page
+   */
   async navigateToLogin(): Promise<void> {
-    await this.navigateTo('/web/index.php/auth/login');
+    await this.goto('/web/index.php/auth/login');
     await this.waitForPageLoad();
   }
 
+  /**
+   * Enter username
+   * @param username - Username to enter
+   */
+  async enterUsername(username: string): Promise<void> {
+    await this.fillText(this.usernameField, username);
+  }
+
+  /**
+   * Enter password
+   * @param password - Password to enter
+   */
+  async enterPassword(password: string): Promise<void> {
+    await this.fillText(this.passwordField, password);
+  }
+
+  /**
+   * Click login button
+   */
+  async clickLogin(): Promise<void> {
+    await this.clickElement(this.loginButton);
+  }
+
+  /**
+   * Complete login process with credentials
+   * @param username - Username
+   * @param password - Password
+   */
   async login(username: string, password: string): Promise<void> {
-    await this.usernameInput.fill(username);
-    await this.passwordInput.fill(password);
-    await this.loginButton.click();
+    await this.enterUsername(username);
+    await this.enterPassword(password);
+    await this.clickLogin();
   }
 
-  async loginAndWaitForDashboard(username: string, password: string): Promise<void> {
-    await this.login(username, password);
-    // Wait for dashboard to load
-    await this.page.waitForURL('**/dashboard/index');
-    await this.waitForPageLoad();
-  }
-
-  async clearLoginForm(): Promise<void> {
-    await this.usernameInput.clear();
-    await this.passwordInput.clear();
-  }
-
+  /**
+   * Get error message text
+   * @returns Promise<string> - Error message
+   */
   async getErrorMessage(): Promise<string> {
     try {
-      await this.errorMessage.waitFor({ state: 'visible', timeout: 3000 });
-      return await this.errorMessage.textContent() || '';
+      await this.waitForElement(this.errorMessage, 5000);
+      return await this.getTextContent(this.errorMessage);
     } catch {
       return '';
     }
   }
 
-  async isErrorMessageVisible(): Promise<boolean> {
+  /**
+   * Check if error message is displayed
+   * @returns Promise<boolean> - Error message visibility
+   */
+  async isErrorMessageDisplayed(): Promise<boolean> {
     return await this.isElementVisible(this.errorMessage);
   }
 
-  async isRequiredFieldErrorVisible(): Promise<boolean> {
-    return await this.isElementVisible(this.requiredFieldError);
+  /**
+   * Verify password field is masked
+   * @returns Promise<boolean> - Password masking status
+   */
+  async isPasswordFieldMasked(): Promise<boolean> {
+    const inputType = await this.passwordField.getAttribute('type');
+    return inputType === 'password';
   }
 
-  async isUsernameRequiredErrorVisible(): Promise<boolean> {
-    return await this.isElementVisible(this.usernameRequiredError);
-  }
-
-  async isPasswordRequiredErrorVisible(): Promise<boolean> {
-    return await this.isElementVisible(this.passwordRequiredError);
-  }
-
-  async hasAnyValidationError(): Promise<boolean> {
-    // Check for invalid credentials alert
-    const hasAlert = await this.isErrorMessageVisible();
-    // Check for required field errors using multiple selectors
-    const hasRequired = await this.isRequiredFieldErrorVisible();
-    
-    // Additional check for any error text on the page
-    const errorTexts = ['Required', 'Invalid credentials', 'invalid', 'error'];
-    let hasErrorText = false;
-    
-    for (const errorText of errorTexts) {
-      try {
-        const errorLocator = this.page.locator(`text=${errorText}`).first();
-        if (await errorLocator.isVisible({ timeout: 1000 })) {
-          hasErrorText = true;
-          break;
-        }
-      } catch {
-        // Continue checking other error texts
-      }
-    }
-    
-    return hasAlert || hasRequired || hasErrorText;
-  }
-
-  async isLoginFormVisible(): Promise<boolean> {
-    return await this.isElementVisible(this.loginCard);
-  }
-
-  async isPasswordMasked(): Promise<boolean> {
-    const passwordType = await this.passwordInput.getAttribute('type');
-    return passwordType === 'password';
-  }
-
+  /**
+   * Get password field value (should be empty for security)
+   * @returns Promise<string> - Password field value
+   */
   async getPasswordFieldValue(): Promise<string> {
-    return await this.passwordInput.inputValue();
+    return await this.passwordField.inputValue();
   }
 
-  async enterUsername(username: string): Promise<void> {
-    await this.usernameInput.fill(username);
+  /**
+   * Verify login form is displayed
+   */
+  async verifyLoginFormDisplayed(): Promise<void> {
+    await expect(this.loginFormContainer).toBeVisible();
+    await expect(this.usernameField).toBeVisible();
+    await expect(this.passwordField).toBeVisible();
+    await expect(this.loginButton).toBeVisible();
   }
 
-  async enterPassword(password: string): Promise<void> {
-    await this.passwordInput.fill(password);
+  /**
+   * Verify Orange HRM logo is displayed
+   */
+  async verifyOrangeHrmLogo(): Promise<void> {
+    await expect(this.orangeHrmLogo).toBeVisible();
   }
 
-  async clickLogin(): Promise<void> {
-    await this.loginButton.click();
+  /**
+   * Clear username field
+   */
+  async clearUsername(): Promise<void> {
+    await this.usernameField.clear();
   }
 
-  async waitForLoginError(): Promise<void> {
-    await this.errorMessage.waitFor({ state: 'visible' });
+  /**
+   * Clear password field
+   */
+  async clearPassword(): Promise<void> {
+    await this.passwordField.clear();
+  }
+
+  /**
+   * Clear all login fields
+   */
+  async clearAllFields(): Promise<void> {
+    await this.clearUsername();
+    await this.clearPassword();
+  }
+
+  /**
+   * Verify login page title
+   */
+  async verifyLoginPageTitle(): Promise<void> {
+    await this.verifyPageTitle('OrangeHRM');
+  }
+
+  /**
+   * Check if username field is focused
+   * @returns Promise<boolean> - Focus status
+   */
+  async isUsernameFieldFocused(): Promise<boolean> {
+    return await this.usernameField.evaluate(element => document.activeElement === element);
+  }
+
+  /**
+   * Get placeholder text for username field
+   * @returns Promise<string> - Placeholder text
+   */
+  async getUsernamePlaceholder(): Promise<string> {
+    return await this.usernameField.getAttribute('placeholder') || '';
+  }
+
+  /**
+   * Get placeholder text for password field
+   * @returns Promise<string> - Placeholder text
+   */
+  async getPasswordPlaceholder(): Promise<string> {
+    return await this.passwordField.getAttribute('placeholder') || '';
+  }
+
+  /**
+   * Verify credentials container is displayed (demo credentials)
+   */
+  async verifyCredentialsContainer(): Promise<void> {
+    await expect(this.credentialsContainer).toBeVisible();
   }
 } 

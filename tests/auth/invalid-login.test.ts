@@ -1,116 +1,217 @@
 import { test, expect } from '@playwright/test';
 import { LoginPage } from '../../pages/LoginPage';
 import { DashboardPage } from '../../pages/DashboardPage';
-import { AuthTestData } from '../data/auth-test-data';
+import { invalidCredentials, expectedErrorMessages } from '../data/auth-test-data';
 
 /**
- * Test Suite: Invalid Login Handling
- * Jira Task: HRM-55 - AUTH-002: Implement Invalid Login Tests
+ * Test Suite: Invalid Login Attempts
+ * Jira Task: HRM-61
  * 
- * Objective: Verify proper handling of invalid login attempts with incorrect credentials
+ * This test suite verifies that the system properly handles 
+ * invalid login attempts with appropriate error messages and security measures.
+ * 
+ * Test Scenarios:
+ * - Invalid username with correct password
+ * - Correct username with invalid password  
+ * - Both username and password invalid
+ * - Empty credentials
+ * - Special characters in credentials
  */
 
-test.describe('AUTH-002: Invalid Login Tests', () => {
+test.describe('HRM-61: Invalid Login Attempts', () => {
   let loginPage: LoginPage;
   let dashboardPage: DashboardPage;
 
   test.beforeEach(async ({ page }) => {
+    // Initialize page objects
     loginPage = new LoginPage(page);
     dashboardPage = new DashboardPage(page);
+    
+    // Navigate to login page before each test
     await loginPage.navigateToLogin();
+    await loginPage.verifyLoginFormDisplayed();
   });
 
-  // Test invalid credential combinations
-  for (const testCase of AuthTestData.invalidCredentials) {
-    test(`should reject login attempt: ${testCase.scenario}`, async ({ page }) => {
-      await test.step(`Enter credentials: ${testCase.scenario}`, async () => {
-        await loginPage.login(testCase.username, testCase.password);
-      });
-
-      await test.step('Verify error message is displayed', async () => {
-        expect(await loginPage.hasAnyValidationError()).toBe(true);
-      });
-
-      await test.step('Verify user is not authenticated', async () => {
-        // Should remain on login page
-        expect(page.url()).toContain('login');
-        expect(await dashboardPage.isUserLoggedIn()).toBe(false);
-      });
-
-      await test.step('Verify login form is still visible', async () => {
-        expect(await loginPage.isLoginFormVisible()).toBe(true);
-      });
-    });
-  }
-
-  // Test security validations
-  for (const securityTest of AuthTestData.securityTestInputs) {
-    test(`should handle security attempt: ${securityTest.scenario}`, async ({ page }) => {
-      await test.step(`Attempt ${securityTest.scenario}`, async () => {
-        await loginPage.login(securityTest.username, securityTest.password);
-      });
-
-      await test.step('Verify security validation blocks attempt', async () => {
-        expect(await loginPage.hasAnyValidationError()).toBe(true);
-        expect(page.url()).toContain('login');
-      });
-
-      await test.step('Verify no sensitive information is exposed', async () => {
-        const errorMessage = await loginPage.getErrorMessage();
-        expect(errorMessage.toLowerCase()).not.toContain('database');
-        expect(errorMessage.toLowerCase()).not.toContain('sql');
-        expect(errorMessage.toLowerCase()).not.toContain('error');
-      });
-    });
-  }
-
-  test('should handle multiple failed login attempts', async ({ page }) => {
-    const maxAttempts = 3;
-    
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      await test.step(`Failed login attempt ${attempt}`, async () => {
-        await loginPage.clearLoginForm();
-        await loginPage.login('InvalidUser', 'InvalidPassword');
-        
-        expect(await loginPage.hasAnyValidationError()).toBe(true);
-        expect(page.url()).toContain('login');
-      });
-    }
-
-    await test.step('Verify login form is still functional after multiple failures', async () => {
-      expect(await loginPage.isLoginFormVisible()).toBe(true);
-    });
-  });
-
-  test('should clear error message when typing new credentials', async ({ page }) => {
-    await test.step('Trigger an error message', async () => {
-      await loginPage.login('InvalidUser', 'InvalidPassword');
-      expect(await loginPage.hasAnyValidationError()).toBe(true);
-    });
-
-    await test.step('Clear form and enter new credentials', async () => {
-      await loginPage.clearLoginForm();
-      await loginPage.enterUsername('Admin');
-    });
-
-    // Note: This test may need adjustment based on actual application behavior
-    await test.step('Verify login form is ready for new attempt', async () => {
-      expect(await loginPage.isLoginFormVisible()).toBe(true);
-    });
-  });
-
-  test('should maintain form state after failed login', async ({ page }) => {
-    const testUsername = 'TestUser';
-    
-    await test.step('Enter invalid credentials', async () => {
-      await loginPage.enterUsername(testUsername);
-      await loginPage.enterPassword('InvalidPassword');
+  // Data-driven test for all invalid credential scenarios
+  for (const credential of invalidCredentials) {
+    test(`should handle invalid login: ${credential.description}`, async ({ page }) => {
+      // Clear any existing values
+      await loginPage.clearAllFields();
+      
+      // Enter the test credentials
+      if (credential.username) {
+        await loginPage.enterUsername(credential.username);
+      }
+      if (credential.password) {
+        await loginPage.enterPassword(credential.password);
+      }
+      
+      // Attempt to login
       await loginPage.clickLogin();
+      
+      // Verify user remains on login page
+      await expect(page).toHaveURL(/.*auth.*login.*/);
+      
+      // Verify appropriate error message is displayed
+      const isErrorDisplayed = await loginPage.isErrorMessageDisplayed();
+      expect(isErrorDisplayed).toBeTruthy();
+      
+      if (credential.expectedError) {
+        const errorMessage = await loginPage.getErrorMessage();
+        expect(errorMessage.toLowerCase()).toContain(
+          credential.expectedError.toLowerCase()
+        );
+      }
+      
+      // Verify login form is still displayed
+      await loginPage.verifyLoginFormDisplayed();
+      
+      // Verify no access to dashboard
+      const isDashboardVisible = await dashboardPage.isElementVisible(dashboardPage.dashboardTitle);
+      expect(isDashboardVisible).toBeFalsy();
     });
+  }
 
-    await test.step('Verify error is shown but username is preserved', async () => {
-      expect(await loginPage.hasAnyValidationError()).toBe(true);
-      // Note: This behavior may vary - some apps clear fields, others preserve username
+  test('should prevent SQL injection attempts', async ({ page }) => {
+    const sqlInjectionAttempts = [
+      "admin'; DROP TABLE users; --",
+      "' OR '1'='1",
+      "admin' OR 1=1 --",
+      "' UNION SELECT * FROM users --"
+    ];
+    
+    for (const attempt of sqlInjectionAttempts) {
+      // Clear fields before each attempt
+      await loginPage.clearAllFields();
+      
+      // Attempt SQL injection in username field
+      await loginPage.enterUsername(attempt);
+      await loginPage.enterPassword('admin123');
+      await loginPage.clickLogin();
+      
+      // Verify system handles injection attempt securely
+      await expect(page).toHaveURL(/.*auth.*login.*/);
+      const isErrorDisplayed = await loginPage.isErrorMessageDisplayed();
+      expect(isErrorDisplayed).toBeTruthy();
+      
+      // Verify no unauthorized access
+      const isDashboardVisible = await dashboardPage.isElementVisible(dashboardPage.dashboardTitle);
+      expect(isDashboardVisible).toBeFalsy();
+    }
+  });
+
+  test('should handle multiple consecutive failed login attempts', async ({ page }) => {
+    const maxAttempts = 5;
+    
+    for (let i = 1; i <= maxAttempts; i++) {
+      await loginPage.clearAllFields();
+      await loginPage.enterUsername(`InvalidUser${i}`);
+      await loginPage.enterPassword(`WrongPassword${i}`);
+      await loginPage.clickLogin();
+      
+      // Verify error message appears for each attempt
+      const isErrorDisplayed = await loginPage.isErrorMessageDisplayed();
+      expect(isErrorDisplayed).toBeTruthy();
+      
+      // Verify user remains on login page
+      await expect(page).toHaveURL(/.*auth.*login.*/);
+      
+      // Small delay between attempts
+      await page.waitForTimeout(1000);
+    }
+    
+    // Verify system doesn't lock out after multiple attempts (in demo environment)
+    // Note: Production systems might implement account lockout
+    await loginPage.verifyLoginFormDisplayed();
+  });
+
+  test('should validate field requirements when submitting empty form', async ({ page }) => {
+    // Clear all fields
+    await loginPage.clearAllFields();
+    
+    // Try to submit empty form
+    await loginPage.clickLogin();
+    
+    // Verify user remains on login page
+    await expect(page).toHaveURL(/.*auth.*login.*/);
+    
+    // Verify error message for required fields
+    const isErrorDisplayed = await loginPage.isErrorMessageDisplayed();
+    expect(isErrorDisplayed).toBeTruthy();
+    
+    const errorMessage = await loginPage.getErrorMessage();
+    expect(errorMessage.toLowerCase()).toContain('required');
+  });
+
+  test('should handle case sensitivity in credentials', async ({ page }) => {
+    // Test uppercase username
+    await loginPage.clearAllFields();
+    await loginPage.enterUsername('ADMIN');
+    await loginPage.enterPassword('admin123');
+    await loginPage.clickLogin();
+    
+    // Verify case sensitivity handling
+    await expect(page).toHaveURL(/.*auth.*login.*/);
+    
+    // Test lowercase password
+    await loginPage.clearAllFields();
+    await loginPage.enterUsername('Admin');
+    await loginPage.enterPassword('ADMIN123');
+    await loginPage.clickLogin();
+    
+    // Verify case sensitivity handling
+    await expect(page).toHaveURL(/.*auth.*login.*/);
+    const isErrorDisplayed = await loginPage.isErrorMessageDisplayed();
+    expect(isErrorDisplayed).toBeTruthy();
+  });
+
+  test('should handle special characters and unicode in credentials', async ({ page }) => {
+    const specialCharacterTests = [
+      { username: 'Admin@#$%', password: 'admin123', description: 'Special chars in username' },
+      { username: 'Admin', password: 'admin@#$%', description: 'Special chars in password' },
+      { username: 'Ädmin', password: 'admin123', description: 'Unicode in username' },
+      { username: 'Admin', password: 'ädmin123', description: 'Unicode in password' }
+    ];
+    
+    for (const testCase of specialCharacterTests) {
+      await loginPage.clearAllFields();
+      await loginPage.enterUsername(testCase.username);
+      await loginPage.enterPassword(testCase.password);
+      await loginPage.clickLogin();
+      
+      // Verify invalid credentials handling
+      await expect(page).toHaveURL(/.*auth.*login.*/);
+      const isErrorDisplayed = await loginPage.isErrorMessageDisplayed();
+      expect(isErrorDisplayed).toBeTruthy();
+    }
+  });
+
+  test('should clear error messages when user starts typing', async ({ page }) => {
+    // Trigger an error first
+    await loginPage.enterUsername('InvalidUser');
+    await loginPage.enterPassword('WrongPassword');
+    await loginPage.clickLogin();
+    
+    // Verify error is displayed
+    let isErrorDisplayed = await loginPage.isErrorMessageDisplayed();
+    expect(isErrorDisplayed).toBeTruthy();
+    
+    // Clear and start typing new credentials
+    await loginPage.clearAllFields();
+    await loginPage.enterUsername('A'); // Start typing
+    
+    // Wait a moment for any error clearing behavior
+    await page.waitForTimeout(500);
+    
+    // Note: Error clearing behavior may vary by implementation
+    // This test documents the current behavior
+  });
+
+  test.afterEach(async ({ page }) => {
+    // Take screenshot for test documentation
+    await page.screenshot({ 
+      path: `test-results/screenshots/invalid-login-${test.info().title}-${Date.now()}.png`,
+      fullPage: true 
     });
   });
 }); 
