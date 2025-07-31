@@ -55,7 +55,7 @@ async function globalSetup(config: FullConfig) {
     
   } catch (error) {
     console.error('❌ Global setup failed:', error);
-    throw new Error(`Environment setup failed: ${error.message}`);
+    throw new Error(`Environment setup failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
